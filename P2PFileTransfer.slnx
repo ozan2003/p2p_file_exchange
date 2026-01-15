@@ -1,0 +1,6 @@
+<Solution>
+    <Folder Name="/src/">
+        <Project Path="src/P2PFileTransfer.Core/P2PFileTransfer.Core.csproj" />
+        <Project Path="src/P2PFileTransfer.Desktop/P2PFileTransfer.Desktop.csproj" />
+    </Folder>
+</Solution>
