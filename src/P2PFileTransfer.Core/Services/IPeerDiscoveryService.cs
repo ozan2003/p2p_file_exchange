@@ -37,7 +37,12 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     bool IsRunning { get; }
 
     /// <summary>
-    /// Starts discovery with the provided TCP listener port and display name.
+    /// The UDP port used for discovery broadcasts.
+    /// </summary>
+    int BroadcastPort { get; }
+
+    /// <summary>
+    /// Starts discovery with the provided TCP listener port and display name for broadcasting.
     /// </summary>
     /// <param name="tcpPort">The TCP port used for file transfers.</param>
     /// <param name="displayName">The display name for the local peer.</param>

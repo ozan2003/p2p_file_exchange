@@ -18,7 +18,14 @@ public sealed class FileTransferService : IFileTransferService
 {
     private const int DefaultBufferSize = 80 * 1024; // 80 KiB
 
+    /// <summary>
+    /// Lock for TCP listener.
+    /// </summary>
     private readonly SemaphoreSlim m_listenerLock = new(1, 1);
+
+    /// <summary>
+    /// The TCP listener for file transfers.
+    /// </summary>
     private TcpListener? m_listener;
     private CancellationTokenSource? m_listenerCts;
     private Task? m_acceptLoopTask;

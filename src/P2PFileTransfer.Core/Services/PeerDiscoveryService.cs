@@ -66,6 +66,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     public bool IsRunning { get; private set; }
 
     /// <inheritdoc />
+    public int BroadcastPort => this.m_options.BroadcastPort;
+
+    /// <inheritdoc />
     public async Task StartAsync(
         int tcpPort,
         string displayName,
