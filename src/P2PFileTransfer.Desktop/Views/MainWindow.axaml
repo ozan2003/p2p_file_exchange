@@ -8,49 +8,141 @@
         x:DataType="vm:MainViewModel"
         Width="960"
         Height="640"
+        MinWidth="640"
+        MinHeight="400"
         Icon="/Assets/avalonia-logo.ico"
         Title="P2P File Transfer">
     <DockPanel>
-        <Border DockPanel.Dock="Bottom" Background="#1E1E1E" Padding="8">
-            <TextBlock Text="{Binding StatusMessage}" Foreground="White" />
+        <!-- Status Bar -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           VerticalAlignment="Center" />
+                <ProgressBar Grid.Column="1"
+                             IsIndeterminate="True"
+                             IsVisible="{Binding IsBusy}"
+                             Width="100"
+                             Height="4"
+                             Margin="12,0,0,0" />
+            </Grid>
         </Border>
 
-        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="8">
-            <TextBlock Text="Display Name:" VerticalAlignment="Center" />
-            <TextBox Width="200" Text="{Binding DisplayName, Mode=TwoWay}" />
-            <Button Content="Start Discovery" Command="{Binding StartDiscoveryCommand}" />
-            <Button Content="Stop Discovery" Command="{Binding StopDiscoveryCommand}" />
-            <Button Content="Send File" Command="{Binding SendFileCommand}" />
-        </StackPanel>
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                Padding="12,8">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="Display Name:"
+                           VerticalAlignment="Center" />
+                <TextBox Width="200"
+                         Text="{Binding DisplayName, Mode=TwoWay}"
+                         MaxLength="64"
+                         Watermark="Enter your name" />
+                <Button Content="Start Discovery"
+                        Command="{Binding StartDiscoveryCommand}" />
+                <Button Content="Stop Discovery"
+                        Command="{Binding StopDiscoveryCommand}" />
+                <Button Content="Send File"
+                        Command="{Binding SendFileCommand}" />
+            </StackPanel>
+        </Border>
 
-        <Grid Margin="8" ColumnDefinitions="*,*">
-            <Border Grid.Column="0" Margin="0,0,8,0" BorderBrush="#3A3A3A" BorderThickness="1" Padding="8">
+        <!-- Main Content -->
+        <Grid Margin="12" ColumnDefinitions="*,12,*">
+            <!-- Peers Panel -->
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SystemControlBackgroundAltMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Discovered Peers" FontWeight="Bold" Margin="0,0,0,6" />
-                    <ListBox ItemsSource="{Binding Peers}" SelectedItem="{Binding SelectedPeer}">
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="Discovered Peers"
+                               FontWeight="SemiBold"
+                               FontSize="14"
+                               Margin="0,0,0,8" />
+                    <TextBlock DockPanel.Dock="Top"
+                               IsVisible="{Binding !Peers.Count}"
+                               Text="No peers discovered. Start discovery to find peers on your network."
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               Margin="0,8,0,0" />
+                    <ListBox ItemsSource="{Binding Peers}"
+                             SelectedItem="{Binding SelectedPeer}"
+                             Background="Transparent"
+                             BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:PeerItemViewModel">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding DisplayName}" FontWeight="Bold" />
-                                    <TextBlock Text="{Binding Endpoint}" FontSize="12" />
+                                <StackPanel Margin="4">
+                                    <TextBlock Text="{Binding DisplayName}"
+                                               FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Endpoint}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </DockPanel>
             </Border>
-            <Border Grid.Column="1" BorderBrush="#3A3A3A" BorderThickness="1" Padding="8">
+
+            <!-- Transfers Panel -->
+            <Border Grid.Column="2"
+                    Background="{DynamicResource SystemControlBackgroundAltMediumLowBrush}"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                    BorderThickness="1"
+                    CornerRadius="4"
+                    Padding="12">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Active Transfers" FontWeight="Bold" Margin="0,0,0,6" />
-                    <ListBox ItemsSource="{Binding Transfers}">
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,8">
+                        <TextBlock Grid.Column="0"
+                                   Text="Active Transfers"
+                                   FontWeight="SemiBold"
+                                   FontSize="14"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Content="Clear"
+                                Command="{Binding ClearCompletedTransfersCommand}"
+                                Padding="8,4"
+                                FontSize="12" />
+                    </Grid>
+                    <TextBlock DockPanel.Dock="Top"
+                               IsVisible="{Binding !Transfers.Count}"
+                               Text="No active transfers. Select a peer and send a file to begin."
+                               Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                               TextWrapping="Wrap"
+                               FontSize="12"
+                               Margin="0,8,0,0" />
+                    <ListBox ItemsSource="{Binding Transfers}"
+                             Background="Transparent"
+                             BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:TransferItemViewModel">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="{Binding Title}" FontWeight="Bold" />
-                                    <TextBlock Text="{Binding RemoteEndpoint}" FontSize="11" />
-                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" />
-                                    <TextBlock Text="{Binding StatusText}" FontSize="12" />
-                                </StackPanel>
+                                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                                        CornerRadius="4"
+                                        Padding="12"
+                                        Margin="0,4">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding RemoteEndpoint}"
+                                                   FontSize="11"
+                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                                        <ProgressBar Minimum="0"
+                                                     Maximum="100"
+                                                     Value="{Binding ProgressPercent}"
+                                                     Height="6" />
+                                        <TextBlock Text="{Binding StatusText}"
+                                                   FontSize="12" />
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

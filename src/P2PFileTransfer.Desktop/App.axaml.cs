@@ -68,6 +68,10 @@ public partial class App : Application
             return;
         }
 
+        MainViewModel? mainViewModel =
+            this.m_serviceProvider.GetService<MainViewModel>();
+        mainViewModel?.Dispose();
+
         IPeerDiscoveryService? discoveryService =
             this.m_serviceProvider.GetService<IPeerDiscoveryService>();
         if (discoveryService != null)

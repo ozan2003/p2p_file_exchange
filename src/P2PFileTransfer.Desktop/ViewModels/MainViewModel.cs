@@ -18,8 +18,12 @@ namespace P2PFileTransfer.Desktop.ViewModels;
 /// <summary>
 /// Main view model for the desktop application.
 /// </summary>
-public sealed class MainViewModel : ReactiveObject
+public sealed class MainViewModel : ReactiveObject, IDisposable
 {
+    private const int MaxDisplayNameLength = 64;
+    private static readonly TimeSpan s_transferRemovalDelay =
+        TimeSpan.FromSeconds(5);
+
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
@@ -30,7 +34,9 @@ public sealed class MainViewModel : ReactiveObject
     private string m_displayName;
     private string m_statusMessage = "Ready.";
     private bool m_isDiscovering;
+    private bool m_isBusy;
     private PeerItemViewModel? m_selectedPeer;
+    private bool m_isDisposed;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MainViewModel"/> class.
@@ -53,21 +59,41 @@ public sealed class MainViewModel : ReactiveObject
         this.Peers = [];
         this.Transfers = [];
 
+        IObservable<bool> canStartDiscovery = this.WhenAnyValue(
+                vm => vm.IsDiscovering,
+                vm => vm.IsBusy
+            )
+            .Select(tuple => !tuple.Item1 && !tuple.Item2);
+
+        IObservable<bool> canStopDiscovery = this.WhenAnyValue(
+                vm => vm.IsDiscovering,
+                vm => vm.IsBusy
+            )
+            .Select(tuple => tuple.Item1 && !tuple.Item2);
+
+        IObservable<bool> canSendFile = this.WhenAnyValue(
+                vm => vm.SelectedPeer,
+                vm => vm.IsBusy
+            )
+            .Select(tuple => tuple.Item1 != null && !tuple.Item2);
+
         this.StartDiscoveryCommand = ReactiveCommand.CreateFromTask(
             this.StartDiscoveryAsync,
-            this.WhenAnyValue(vm => vm.IsDiscovering)
-                .Select(isRunning => !isRunning)
+            canStartDiscovery
         );
 
         this.StopDiscoveryCommand = ReactiveCommand.CreateFromTask(
             this.StopDiscoveryAsync,
-            this.WhenAnyValue(vm => vm.IsDiscovering)
+            canStopDiscovery
         );
 
         this.SendFileCommand = ReactiveCommand.CreateFromTask(
             this.SendFileAsync,
-            this.WhenAnyValue(vm => vm.SelectedPeer)
-                .Select(peer => peer != null)
+            canSendFile
+        );
+
+        this.ClearCompletedTransfersCommand = ReactiveCommand.Create(
+            this.ClearCompletedTransfers
         );
 
         peerDiscoveryService.PeerUpdated += this.OnPeerUpdated;
@@ -99,8 +125,14 @@ public sealed class MainViewModel : ReactiveObject
         get => this.m_displayName;
         set
         {
-            this.RaiseAndSetIfChanged(ref this.m_displayName, value);
-            this.m_peerDiscoveryService.UpdateDisplayName(value);
+            string sanitized = SanitizeDisplayName(value);
+            if (this.m_displayName == sanitized)
+            {
+                return;
+            }
+
+            this.RaiseAndSetIfChanged(ref this.m_displayName, sanitized);
+            this.m_peerDiscoveryService.UpdateDisplayName(sanitized);
         }
     }
 
@@ -112,6 +144,15 @@ public sealed class MainViewModel : ReactiveObject
         get => this.m_isDiscovering;
         private set =>
             this.RaiseAndSetIfChanged(ref this.m_isDiscovering, value);
+    }
+
+    /// <summary>
+    /// A value indicating whether an operation is in progress.
+    /// </summary>
+    public bool IsBusy
+    {
+        get => this.m_isBusy;
+        private set => this.RaiseAndSetIfChanged(ref this.m_isBusy, value);
     }
 
     /// <summary>
@@ -159,6 +200,11 @@ public sealed class MainViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> SendFileCommand { get; }
 
     /// <summary>
+    /// The command to clear completed transfers.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ClearCompletedTransfersCommand { get; }
+
+    /// <summary>
     /// Initializes the background services.
     /// </summary>
     public async Task InitializeAsync()
@@ -185,6 +231,49 @@ public sealed class MainViewModel : ReactiveObject
         }
     }
 
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        if (this.m_isDisposed)
+        {
+            return;
+        }
+
+        this.m_isDisposed = true;
+
+        this.m_peerDiscoveryService.PeerUpdated -= this.OnPeerUpdated;
+        this.m_peerDiscoveryService.PeerRemoved -= this.OnPeerRemoved;
+        this.m_peerDiscoveryService.StatusChanged -= this.OnStatusChanged;
+
+        this.m_fileTransferService.TransferStarted -= this.OnTransferStarted;
+        this.m_fileTransferService.TransferProgressChanged -=
+            this.OnTransferProgressChanged;
+        this.m_fileTransferService.TransferCompleted -=
+            this.OnTransferCompleted;
+        this.m_fileTransferService.TransferFailed -= this.OnTransferFailed;
+
+        this.StartDiscoveryCommand.Dispose();
+        this.StopDiscoveryCommand.Dispose();
+        this.SendFileCommand.Dispose();
+        this.ClearCompletedTransfersCommand.Dispose();
+    }
+
+    private static string SanitizeDisplayName(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return GetDefaultDisplayName();
+        }
+
+        string trimmed = value.Trim();
+        if (trimmed.Length > MaxDisplayNameLength)
+        {
+            trimmed = trimmed[..MaxDisplayNameLength];
+        }
+
+        return trimmed;
+    }
+
     private async Task StartDiscoveryAsync()
     {
         if (this.m_fileTransferService.ListenerPort <= 0)
@@ -193,24 +282,40 @@ public sealed class MainViewModel : ReactiveObject
             return;
         }
 
-        await this
-            .m_peerDiscoveryService.StartAsync(
-                this.m_fileTransferService.ListenerPort,
-                this.DisplayName,
-                CancellationToken.None
-            )
-            .ConfigureAwait(false);
+        this.SetBusy(true);
+        try
+        {
+            await this
+                .m_peerDiscoveryService.StartAsync(
+                    this.m_fileTransferService.ListenerPort,
+                    this.DisplayName,
+                    CancellationToken.None
+                )
+                .ConfigureAwait(false);
 
-        this.SetDiscoveryState(
-            true,
-            $"Peer discovery on UDP {this.m_peerDiscoveryService.BroadcastPort} started."
-        );
+            this.SetDiscoveryState(
+                true,
+                $"Peer discovery on UDP {this.m_peerDiscoveryService.BroadcastPort} started."
+            );
+        }
+        finally
+        {
+            this.SetBusy(false);
+        }
     }
 
     private async Task StopDiscoveryAsync()
     {
-        await this.m_peerDiscoveryService.StopAsync().ConfigureAwait(false);
-        this.SetDiscoveryState(false, "Discovery stopped.");
+        this.SetBusy(true);
+        try
+        {
+            await this.m_peerDiscoveryService.StopAsync().ConfigureAwait(false);
+            this.SetDiscoveryState(false, "Discovery stopped.");
+        }
+        finally
+        {
+            this.SetBusy(false);
+        }
     }
 
     private async Task SendFileAsync()
@@ -240,6 +345,24 @@ public sealed class MainViewModel : ReactiveObject
                 CancellationToken.None
             )
             .ConfigureAwait(false);
+    }
+
+    private void ClearCompletedTransfers()
+    {
+        List<TransferItemViewModel> toRemove = [];
+        foreach (TransferItemViewModel transfer in this.Transfers)
+        {
+            if (transfer.IsFinished)
+            {
+                toRemove.Add(transfer);
+            }
+        }
+
+        foreach (TransferItemViewModel transfer in toRemove)
+        {
+            this.m_transferLookup.Remove(transfer.TransferId);
+            this.Transfers.Remove(transfer);
+        }
     }
 
     private void OnPeerUpdated(object? sender, PeerInfo peer)
@@ -350,6 +473,7 @@ public sealed class MainViewModel : ReactiveObject
             )
             {
                 transfer.MarkCompleted();
+                this.ScheduleTransferRemoval(args.TransferId);
             }
 
             this.StatusMessage =
@@ -369,9 +493,31 @@ public sealed class MainViewModel : ReactiveObject
             )
             {
                 transfer.MarkFailed(args.ErrorMessage);
+                this.ScheduleTransferRemoval(args.TransferId);
             }
 
             this.StatusMessage = args.ErrorMessage;
+        });
+    }
+
+    private void ScheduleTransferRemoval(Guid transferId)
+    {
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(s_transferRemovalDelay).ConfigureAwait(false);
+            Dispatcher.UIThread.Post(() =>
+            {
+                if (
+                    this.m_transferLookup.TryGetValue(
+                        transferId,
+                        out TransferItemViewModel? transfer
+                    )
+                )
+                {
+                    this.m_transferLookup.Remove(transferId);
+                    this.Transfers.Remove(transfer);
+                }
+            });
         });
     }
 
@@ -390,6 +536,11 @@ public sealed class MainViewModel : ReactiveObject
     private void SetStatusMessage(string message)
     {
         Dispatcher.UIThread.Post(() => this.StatusMessage = message);
+    }
+
+    private void SetBusy(bool isBusy)
+    {
+        Dispatcher.UIThread.Post(() => this.IsBusy = isBusy);
     }
 
     private void SetDiscoveryState(bool isRunning, string message)

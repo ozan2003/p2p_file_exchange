@@ -11,6 +11,7 @@ public sealed class TransferItemViewModel : ReactiveObject
 {
     private int m_progressPercent;
     private string m_statusText;
+    private bool m_isFinished;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransferItemViewModel"/> class.
@@ -84,6 +85,15 @@ public sealed class TransferItemViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// A value indicating whether the transfer has finished (completed or failed).
+    /// </summary>
+    public bool IsFinished
+    {
+        get => this.m_isFinished;
+        private set => this.RaiseAndSetIfChanged(ref this.m_isFinished, value);
+    }
+
+    /// <summary>
     /// Updates the transfer progress percentage.
     /// </summary>
     /// <param name="progress">The progress percent.</param>
@@ -103,6 +113,7 @@ public sealed class TransferItemViewModel : ReactiveObject
     {
         this.ProgressPercent = 100;
         this.StatusText = "Completed";
+        this.IsFinished = true;
     }
 
     /// <summary>
@@ -112,5 +123,6 @@ public sealed class TransferItemViewModel : ReactiveObject
     public void MarkFailed(string errorMessage)
     {
         this.StatusText = errorMessage;
+        this.IsFinished = true;
     }
 }
