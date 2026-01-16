@@ -7,7 +7,7 @@ using P2PFileTransfer.Core.Models;
 namespace P2PFileTransfer.Core.Services;
 
 /// <summary>
-/// Describes peer discovery operations over UDP broadcast.
+/// Describes peer discovery operations over UDP broadcast on the same LAN.
 /// </summary>
 public interface IPeerDiscoveryService : IAsyncDisposable
 {

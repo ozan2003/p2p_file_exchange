@@ -10,8 +10,46 @@ namespace P2PFileTransfer.Core.Services;
 
 /// <summary>
 /// Implements the wire protocol for metadata and chunk payloads.
-///
 /// Not to be confused with the actual File Transfer Protocol (FTP).
+/// </summary>
+/// <remarks>
+/// <para><b>Wire Protocol</b></para>
+/// <para>
+/// All integers are encoded as <b>little-endian 32-bit signed integers</b>.
+/// A single file transfer consists of one metadata frame followed by N chunk frames.
+/// </para>
+///
+/// <para><b>Metadata Frame</b></para>
+/// <code>
+/// ┌─────────────────────────────────────────────────────────┐
+/// │ [4 bytes] JSON payload length (int32, little-endian)    │
+/// ├─────────────────────────────────────────────────────────┤
+/// │ [N bytes] JSON payload (UTF-8 encoded FileMetadata)     │
+/// │           {                                             │
+/// │             "fileName": "example.txt",                  │
+/// │             "fileSize": 1048576,                        │
+/// │             "totalChunksNumber": 4,                     │
+/// │             "chunkSize": 262144                         │
+/// │           }                                             │
+/// └─────────────────────────────────────────────────────────┘
+/// </code>
+///
+/// <para><b>Chunk Frame</b> (repeated <c>totalChunksNumber</c> times)</para>
+/// <code>
+/// ┌─────────────────────────────────────────────────────────┐
+/// │ [4 bytes]  Chunk index (int32, zero-based)              │
+/// ├─────────────────────────────────────────────────────────┤
+/// │ [4 bytes]  Data length (int32)                          │
+/// ├─────────────────────────────────────────────────────────┤
+/// │ [4 bytes]  Hash length (int32, always 32 for SHA-256)   │
+/// ├─────────────────────────────────────────────────────────┤
+/// │ [N bytes]  Chunk data (raw file bytes)                  │
+/// ├─────────────────────────────────────────────────────────┤
+/// │ [32 bytes] SHA-256 hash of chunk data                   │
+/// └─────────────────────────────────────────────────────────┘
+/// </code>
+///
+/// </remarks>
 /// </summary>
 internal static class FileTransferProtocol
 {
@@ -19,23 +57,37 @@ internal static class FileTransferProtocol
         JsonSerializerDefaults.Web
     );
 
+    /// <summary>
+    /// Writes a metadata frame to the stream (length-prefixed JSON).
+    /// </summary>
+    /// <param name="stream">The network stream to write to.</param>
+    /// <param name="metadata">The file metadata to serialize.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
     public static async Task WriteMetadataAsync(
         Stream stream,
         FileMetadata metadata,
         CancellationToken cancellationToken
     )
     {
-        byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
+        byte[] jsonPayload = JsonSerializer.SerializeToUtf8Bytes(
             metadata,
             s_jsonOptions
         );
-        await WriteInt32Async(stream, payload.Length, cancellationToken)
+        // Write length first.
+        await WriteInt32Async(stream, jsonPayload.Length, cancellationToken)
             .ConfigureAwait(false);
         await stream
-            .WriteAsync(payload, cancellationToken)
+            .WriteAsync(jsonPayload, cancellationToken)
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reads a metadata frame from the stream.
+    /// </summary>
+    /// <param name="stream">The network stream to read from.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The deserialized file metadata.</returns>
+    /// <exception cref="InvalidDataException">Thrown when the metadata payload is malformed.</exception>
     public static async Task<FileMetadata> ReadMetadataAsync(
         Stream stream,
         CancellationToken cancellationToken
@@ -43,10 +95,16 @@ internal static class FileTransferProtocol
     {
         int length = await ReadInt32Async(stream, cancellationToken)
             .ConfigureAwait(false);
-        byte[] payload = await ReadExactAsync(stream, length, cancellationToken)
+        byte[] jsonPayload = await ReadExactAsync(
+                stream,
+                length,
+                cancellationToken
+            )
             .ConfigureAwait(false);
+
+        // Create metadata object from JSON payload.
         FileMetadata? metadata = JsonSerializer.Deserialize<FileMetadata>(
-            payload,
+            jsonPayload,
             s_jsonOptions
         );
 
@@ -58,6 +116,12 @@ internal static class FileTransferProtocol
         return metadata;
     }
 
+    /// <summary>
+    /// Writes a chunk frame to the stream (index + lengths + data + hash).
+    /// </summary>
+    /// <param name="stream">The network stream to write to.</param>
+    /// <param name="chunk">The file chunk to transmit.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
     public static async Task WriteChunkAsync(
         Stream stream,
         FileChunk chunk,
@@ -78,6 +142,12 @@ internal static class FileTransferProtocol
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reads a chunk frame from the stream.
+    /// </summary>
+    /// <param name="stream">The network stream to read from.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The deserialized file chunk (index, data, and hash).</returns>
     public static async Task<FileChunk> ReadChunkAsync(
         Stream stream,
         CancellationToken cancellationToken
@@ -89,6 +159,7 @@ internal static class FileTransferProtocol
             .ConfigureAwait(false);
         int hashLength = await ReadInt32Async(stream, cancellationToken)
             .ConfigureAwait(false);
+
         byte[] data = await ReadExactAsync(
                 stream,
                 dataLength,
@@ -110,6 +181,12 @@ internal static class FileTransferProtocol
         };
     }
 
+    /// <summary>
+    /// Writes a 32-bit integer to the stream in little-endian byte order.
+    /// </summary>
+    /// <param name="stream">The stream to write to.</param>
+    /// <param name="value">The integer value to write.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
     private static async Task WriteInt32Async(
         Stream stream,
         int value,
@@ -123,6 +200,12 @@ internal static class FileTransferProtocol
             .ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Reads a 32-bit integer from the stream in little-endian byte order.
+    /// </summary>
+    /// <param name="stream">The stream to read from.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The integer value read from the stream.</returns>
     private static async Task<int> ReadInt32Async(
         Stream stream,
         CancellationToken cancellationToken
@@ -137,6 +220,16 @@ internal static class FileTransferProtocol
         return BinaryPrimitives.ReadInt32LittleEndian(buffer);
     }
 
+    /// <summary>
+    /// Reads exactly the specified number of bytes from the stream.
+    /// Throws <see cref="EndOfStreamException"/> if the stream ends prematurely.
+    /// </summary>
+    /// <param name="stream">The stream to read from.</param>
+    /// <param name="length">The exact number of bytes to read.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>A byte array containing the read data.</returns>
+    /// <exception cref="InvalidDataException">Thrown when length is negative.</exception>
+    /// <exception cref="EndOfStreamException">Thrown when the stream ends before all bytes are read.</exception>
     private static async Task<byte[]> ReadExactAsync(
         Stream stream,
         int length,

@@ -11,7 +11,7 @@ public sealed class FileChunk
     public int ChunkIndex { get; set; }
 
     /// <summary>
-    /// The data being chunked.
+    /// The raw byte content of this chunk.
     /// </summary>
     public byte[] Data { get; set; } = [];
 

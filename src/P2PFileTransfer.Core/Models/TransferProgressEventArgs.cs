@@ -24,7 +24,7 @@ public sealed class TransferProgressEventArgs : EventArgs
     public Guid TransferId { get; }
 
     /// <summary>
-    /// The progress percent.
+    /// The transfer progress percentage (0–100).
     /// </summary>
     public int ProgressPercent { get; }
 }

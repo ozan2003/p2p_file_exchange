@@ -8,7 +8,7 @@ namespace P2PFileTransfer.Core.Models;
 public sealed class PeerInfo
 {
     /// <summary>
-    /// The unique UUID of the peer.
+    /// The unique identifier of the peer
     /// </summary>
     public Guid PeerId { get; set; }
 

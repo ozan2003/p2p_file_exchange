@@ -264,6 +264,12 @@ public sealed class FileTransferService : IFileTransferService
         this.m_listenerLock.Dispose();
     }
 
+    /// <summary>
+    /// Continuously accepts incoming TCP connections and dispatches them for handling.
+    /// Runs until cancellation is requested or the listener is stopped.
+    /// </summary>
+    /// <param name="tcpListener">The TCP listener to accept connections from.</param>
+    /// <param name="cancellationToken">A token to signal loop termination.</param>
     private async Task AcceptLoopAsync(
         TcpListener tcpListener,
         CancellationToken cancellationToken
@@ -296,6 +302,13 @@ public sealed class FileTransferService : IFileTransferService
         }
     }
 
+    /// <summary>
+    /// Handles an incoming file transfer connection. Reads metadata and chunks from the
+    /// network stream, verifies chunk integrity via SHA256, and writes data to disk.
+    /// Deletes partial files on failure or cancellation.
+    /// </summary>
+    /// <param name="client">The accepted TCP client connection.</param>
+    /// <param name="cancellationToken">A token to cancel the transfer.</param>
     private async Task HandleIncomingAsync(
         TcpClient client,
         CancellationToken cancellationToken
@@ -434,6 +447,12 @@ public sealed class FileTransferService : IFileTransferService
         }
     }
 
+    /// <summary>
+    /// Calculates the transfer progress as a percentage clamped to 0–100.
+    /// </summary>
+    /// <param name="completedChunks">The number of chunks transferred so far.</param>
+    /// <param name="totalChunks">The total number of chunks in the transfer.</param>
+    /// <returns>The progress percentage (0–100).</returns>
     private static int CalculateProgressPercent(
         int completedChunks,
         int totalChunks
@@ -449,6 +468,12 @@ public sealed class FileTransferService : IFileTransferService
         return Math.Clamp(percent, 0, 100);
     }
 
+    /// <summary>
+    /// Sanitizes a file name by stripping directory components to prevent path traversal attacks.
+    /// Returns a default name if the input is null or empty.
+    /// </summary>
+    /// <param name="fileName">The raw file name from the transfer metadata.</param>
+    /// <returns>A safe file name without directory separators.</returns>
     private static string SanitizeFileName(string? fileName)
     {
         string sanitized = Path.GetFileName(fileName ?? string.Empty);

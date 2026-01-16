@@ -196,11 +196,21 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         this.m_stateLock.Dispose();
     }
 
+    /// <summary>
+    /// Normalizes a display name by trimming whitespace and providing a default value.
+    /// </summary>
+    /// <param name="name">The raw display name.</param>
+    /// <returns>The normalized display name, or "Unknown" if empty.</returns>
     private static string NormalizeDisplayName(string? name)
     {
         return string.IsNullOrWhiteSpace(name) ? "Unknown" : name.Trim();
     }
 
+    /// <summary>
+    /// Creates and configures a UDP client for listening to peer announcements.
+    /// Binds to the configured broadcast port with address reuse enabled.
+    /// </summary>
+    /// <returns>A configured UDP client ready to receive broadcasts.</returns>
     private UdpClient CreateListenerClient()
     {
         UdpClient client = new(AddressFamily.InterNetwork)
@@ -220,6 +230,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         return client;
     }
 
+    /// <summary>
+    /// Creates and configures a UDP client for sending broadcast announcements.
+    /// </summary>
+    /// <returns>A configured UDP client ready to send broadcasts.</returns>
     private static UdpClient CreateBroadcastClient()
     {
         UdpClient client = new(AddressFamily.InterNetwork)
@@ -235,6 +249,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         return client;
     }
 
+    /// <summary>
+    /// Periodically broadcasts the local peer's announcement to the network.
+    /// Runs at the configured interval until cancellation.
+    /// </summary>
+    /// <param name="client">The UDP client used for broadcasting.</param>
+    /// <param name="cancellationToken">A token to signal loop termination.</param>
     private async Task BroadcastLoopAsync(
         UdpClient client,
         CancellationToken cancellationToken
@@ -283,6 +303,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         }
     }
 
+    /// <summary>
+    /// Continuously listens for peer announcements and updates the peer registry.
+    /// Ignores announcements from the local peer and malformed payloads.
+    /// </summary>
+    /// <param name="client">The UDP client used for receiving announcements.</param>
+    /// <param name="cancellationToken">A token to signal loop termination.</param>
     private async Task ListenLoopAsync(
         UdpClient client,
         CancellationToken cancellationToken
@@ -369,6 +395,11 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         }
     }
 
+    /// <summary>
+    /// Periodically removes stale peers that have not been seen within the timeout period.
+    /// Runs at the configured cleanup interval until cancellation.
+    /// </summary>
+    /// <param name="cancellationToken">A token to signal loop termination.</param>
     private async Task CleanupLoopAsync(CancellationToken cancellationToken)
     {
         using PeriodicTimer timer = new(this.m_options.CleanupInterval);
@@ -396,6 +427,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         }
     }
 
+    /// <summary>
+    /// Internal DTO representing a peer announcement payload broadcast over UDP.
+    /// Serialized to/from JSON for network transmission.
+    /// </summary>
     private sealed class PeerAnnouncement
     {
         public Guid PeerId { get; set; }
