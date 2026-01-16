@@ -89,7 +89,7 @@ public sealed class FileTransferService : IFileTransferService
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            this.m_acceptLoopTask = AcceptLoopAsync(
+            this.m_acceptLoopTask = this.AcceptLoopAsync(
                 this.m_listener,
                 this.m_listenerCts.Token
             );
