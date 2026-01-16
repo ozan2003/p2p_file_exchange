@@ -85,10 +85,12 @@ public sealed class FileTransferService : IFileTransferService
             this.ListenerPort = (
                 (IPEndPoint)this.m_listener.LocalEndpoint
             ).Port;
+
             this.m_listenerCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
+
             this.m_acceptLoopTask = this.AcceptLoopAsync(
                 this.m_listener,
                 this.m_listenerCts.Token
@@ -141,8 +143,6 @@ public sealed class FileTransferService : IFileTransferService
         CancellationToken cancellationToken
     )
     {
-        ArgumentNullException.ThrowIfNull(peer, nameof(peer));
-
         if (string.IsNullOrWhiteSpace(filePath))
         {
             throw new ArgumentException(
@@ -173,6 +173,7 @@ public sealed class FileTransferService : IFileTransferService
             ChunkSize = FileChunker.DefaultChunkSize,
         };
 
+        // Create a unique transfer ID and notify the UI that the transfer has started.
         Guid transferId = Guid.NewGuid();
         TransferStarted?.Invoke(
             this,
@@ -187,17 +188,20 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
+            // Connect to the peer via TCP.
             using TcpClient client = new();
             await client
                 .ConnectAsync(remoteAddress, peer.TcpPort, cancellationToken)
                 .ConfigureAwait(false);
             client.NoDelay = true;
 
+            // Send metadata to the peer.
             await using NetworkStream networkStream = client.GetStream();
             await FileTransferProtocol
                 .WriteMetadataAsync(networkStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
 
+            // Read the file chunks and send them to the peer.
             await using FileStream fileStream = new(
                 filePath,
                 FileMode.Open,
@@ -224,6 +228,7 @@ public sealed class FileTransferService : IFileTransferService
                     chunkIndex,
                     metadata.TotalChunksNumber
                 );
+                // Update the progress bar in the UI.
                 progress?.Report(progressPercent);
                 TransferProgressChanged?.Invoke(
                     this,
@@ -231,6 +236,7 @@ public sealed class FileTransferService : IFileTransferService
                 );
             }
 
+            // Notify the UI that the transfer has completed if everything went right.
             TransferCompleted?.Invoke(
                 this,
                 new TransferCompletedEventArgs(
@@ -242,6 +248,7 @@ public sealed class FileTransferService : IFileTransferService
         }
         catch (OperationCanceledException)
         {
+            // Notify the UI that the transfer has failed.
             TransferFailed?.Invoke(
                 this,
                 new TransferFailedEventArgs(
@@ -251,14 +258,15 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
         }
-        catch (Exception ex)
+        catch (Exception exc)
         {
+            // Notify any exception that occurred during the transfer.
             TransferFailed?.Invoke(
                 this,
                 new TransferFailedEventArgs(
                     transferId,
                     TransferMode.Send,
-                    $"Transfer failed: {ex.Message}"
+                    $"Transfer failed: {exc.Message}"
                 )
             );
         }
@@ -327,6 +335,7 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
+            // Set up the network stream for the incoming connection.
             using TcpClient _ = client;
             await using NetworkStream networkStream = client.GetStream();
             FileMetadata metadata = await FileTransferProtocol
@@ -337,6 +346,7 @@ public sealed class FileTransferService : IFileTransferService
 
             string remoteEndpoint =
                 client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
+            // Set up the destination path for the received file.
             destinationPath = FilePathUtilities.GetUniquePath(
                 Path.Combine(this.m_downloadDirectory, metadata.FileName)
             );
@@ -371,21 +381,25 @@ public sealed class FileTransferService : IFileTransferService
                     .ReadChunkAsync(networkStream, cancellationToken)
                     .ConfigureAwait(false);
 
+                // Match the chunk index.
                 if (chunk.ChunkIndex != expectedIndex)
                 {
                     throw new InvalidDataException("Chunk index mismatch.");
                 }
 
+                // Verify the chunk hash.
                 byte[] hash = SHA256.HashData(chunk.Data);
                 if (!hash.AsSpan().SequenceEqual(chunk.Hash))
                 {
                     throw new InvalidDataException("Chunk hash mismatch.");
                 }
 
+                // Write to disk as we receive the chunks.
                 await fileStream
                     .WriteAsync(chunk.Data, cancellationToken)
                     .ConfigureAwait(false);
 
+                // Update the progress bar in the UI.
                 int progressPercent = CalculateProgressPercent(
                     expectedIndex + 1,
                     metadata.TotalChunksNumber
@@ -399,6 +413,7 @@ public sealed class FileTransferService : IFileTransferService
             await fileStream
                 .FlushAsync(cancellationToken)
                 .ConfigureAwait(false);
+            // Report the progress as 100% when the transfer is complete.
             TransferCompleted?.Invoke(
                 this,
                 new TransferCompletedEventArgs(

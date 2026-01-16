@@ -321,12 +321,15 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         {
             try
             {
-                UdpReceiveResult result = await client
+                // Receive the announcement from the network.
+                UdpReceiveResult received = await client
                     .ReceiveAsync(cancellationToken)
                     .ConfigureAwait(false);
+
+                // Assumed the format is valid JSON. Unpack it.
                 PeerAnnouncement? announcement =
                     JsonSerializer.Deserialize<PeerAnnouncement>(
-                        result.Buffer,
+                        received.Buffer,
                         this.m_jsonOptions
                     );
 
@@ -344,36 +347,45 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 }
 
                 DateTimeOffset now = DateTimeOffset.UtcNow;
-                string address = string.IsNullOrWhiteSpace(
-                    announcement.IPAddress
-                )
-                    ? result.RemoteEndPoint.Address.ToString()
-                    : announcement.IPAddress;
 
+                string ipAddress = string.Empty;
+                if (string.IsNullOrWhiteSpace(announcement.IPAddress))
+                {
+                    ipAddress = received.RemoteEndPoint.Address.ToString();
+                }
+                else
+                {
+                    ipAddress = announcement.IPAddress;
+                }
+
+                // Peers info is updated here.
                 PeerInfo peerInfo = this.m_peers.AddOrUpdate(
                     announcement.PeerId,
+                    // Add a new peer if it doesn't exist.
                     _ => new PeerInfo
                     {
                         PeerId = announcement.PeerId,
                         DisplayName = NormalizeDisplayName(
                             announcement.DisplayName
                         ),
-                        IPAddress = address,
+                        IPAddress = ipAddress,
                         TcpPort = announcement.TcpPort,
                         LastSeen = now,
                     },
+                    // Update existing peer info otherwise.
                     (_, existing) =>
                     {
                         existing.DisplayName = NormalizeDisplayName(
                             announcement.DisplayName
                         );
-                        existing.IPAddress = address;
+                        existing.IPAddress = ipAddress;
                         existing.TcpPort = announcement.TcpPort;
                         existing.LastSeen = now;
                         return existing;
                     }
                 );
 
+                // Notify the UI that the peer info has been updated.
                 PeerUpdated?.Invoke(this, peerInfo);
             }
             catch (OperationCanceledException)
@@ -384,11 +396,11 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             {
                 return;
             }
-            catch (SocketException ex)
+            catch (SocketException exc)
             {
                 StatusChanged?.Invoke(
                     this,
-                    $"Discovery listen failed: {ex.Message}"
+                    $"Discovery listen failed: {exc.Message}"
                 );
             }
             catch (JsonException)
@@ -415,16 +427,16 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             cancellationToken.ThrowIfCancellationRequested();
             DateTimeOffset expiration =
                 DateTimeOffset.UtcNow - this.m_options.PeerTimeout;
-            foreach ((Guid key, PeerInfo value) in this.m_peers)
+            foreach ((Guid guid, PeerInfo peer) in this.m_peers)
             {
-                if (value.LastSeen >= expiration)
+                if (peer.LastSeen >= expiration)
                 {
                     continue;
                 }
 
-                if (this.m_peers.TryRemove(key, out _))
+                if (this.m_peers.TryRemove(guid, out _))
                 {
-                    PeerRemoved?.Invoke(this, key);
+                    PeerRemoved?.Invoke(this, guid);
                 }
             }
         }
@@ -432,6 +444,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
     /// <summary>
     /// Internal DTO representing a peer announcement payload broadcast over UDP.
+    ///
+    /// Each peer sends its own info to the network.
+    ///
     /// Serialized to/from JSON for network transmission.
     /// </summary>
     private sealed class PeerAnnouncement

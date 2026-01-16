@@ -31,7 +31,7 @@ public interface IFileTransferService : IAsyncDisposable
     event EventHandler<TransferFailedEventArgs>? TransferFailed;
 
     /// <summary>
-    /// The TCP listener port.
+    /// The TCP listener port for inbound file transfers.
     /// </summary>
     int ListenerPort { get; }
 
