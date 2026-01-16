@@ -93,6 +93,7 @@ internal static class FileTransferProtocol
         CancellationToken cancellationToken
     )
     {
+        // read length then read the payload.
         int length = await ReadInt32Async(stream, cancellationToken)
             .ConfigureAwait(false);
         byte[] jsonPayload = await ReadExactAsync(
@@ -153,6 +154,7 @@ internal static class FileTransferProtocol
         CancellationToken cancellationToken
     )
     {
+        // read the index, data length, and hash length.
         int chunkIndex = await ReadInt32Async(stream, cancellationToken)
             .ConfigureAwait(false);
         int dataLength = await ReadInt32Async(stream, cancellationToken)
@@ -160,6 +162,7 @@ internal static class FileTransferProtocol
         int hashLength = await ReadInt32Async(stream, cancellationToken)
             .ConfigureAwait(false);
 
+        // read the data and hash.
         byte[] data = await ReadExactAsync(
                 stream,
                 dataLength,
@@ -222,7 +225,6 @@ internal static class FileTransferProtocol
 
     /// <summary>
     /// Reads exactly the specified number of bytes from the stream.
-    /// Throws <see cref="EndOfStreamException"/> if the stream ends prematurely.
     /// </summary>
     /// <param name="stream">The stream to read from.</param>
     /// <param name="length">The exact number of bytes to read.</param>
