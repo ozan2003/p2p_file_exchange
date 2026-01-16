@@ -1,3 +1,5 @@
+using System;
+
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
@@ -9,31 +11,31 @@ public sealed class TransferCompletedEventArgs : EventArgs
     /// Initializes a new instance of the <see cref="TransferCompletedEventArgs"/> class.
     /// </summary>
     /// <param name="transferId">The transfer identifier.</param>
-    /// <param name="direction">The transfer direction.</param>
+    /// <param name="mode">The transfer mode.</param>
     /// <param name="filePath">The local file path used for the transfer.</param>
     public TransferCompletedEventArgs(
         Guid transferId,
-        TransferDirection direction,
+        TransferMode mode,
         string filePath
     )
     {
-        TransferId = transferId;
-        Direction = direction;
-        FilePath = filePath;
+        this.TransferId = transferId;
+        this.Mode = mode;
+        this.FilePath = filePath;
     }
 
     /// <summary>
-    /// Gets the transfer identifier.
+    /// The transfer identifier.
     /// </summary>
     public Guid TransferId { get; }
 
     /// <summary>
-    /// Gets the transfer direction.
+    /// The transfer mode.
     /// </summary>
-    public TransferDirection Direction { get; }
+    public TransferMode Mode { get; }
 
     /// <summary>
-    /// Gets the local file path used for the transfer.
+    /// The local file path used for the transfer.
     /// </summary>
     public string FilePath { get; }
 }

@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 
 namespace P2PFileTransfer.Core.Services;
@@ -28,7 +31,7 @@ public interface IFileTransferService : IAsyncDisposable
     event EventHandler<TransferFailedEventArgs>? TransferFailed;
 
     /// <summary>
-    /// Gets the TCP listener port.
+    /// The TCP listener port.
     /// </summary>
     int ListenerPort { get; }
 

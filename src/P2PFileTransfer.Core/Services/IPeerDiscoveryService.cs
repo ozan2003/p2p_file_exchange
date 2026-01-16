@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 
 namespace P2PFileTransfer.Core.Services;
@@ -23,12 +27,12 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     event EventHandler<string>? StatusChanged;
 
     /// <summary>
-    /// Gets the local peer identifier.
+    /// The local peer identifier.
     /// </summary>
     Guid LocalPeerId { get; }
 
     /// <summary>
-    /// Gets a value indicating whether discovery is running.
+    /// A value indicating whether discovery is running.
     /// </summary>
     bool IsRunning { get; }
 
@@ -56,7 +60,7 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     void UpdateDisplayName(string displayName);
 
     /// <summary>
-    /// Gets the currently discovered peers.
+    /// The currently discovered peers.
     /// </summary>
     IReadOnlyCollection<PeerInfo> GetPeers();
 }

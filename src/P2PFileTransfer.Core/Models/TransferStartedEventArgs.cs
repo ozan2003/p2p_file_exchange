@@ -1,3 +1,5 @@
+using System;
+
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
@@ -9,47 +11,47 @@ public sealed class TransferStartedEventArgs : EventArgs
     /// Initializes a new instance of the <see cref="TransferStartedEventArgs"/> class.
     /// </summary>
     /// <param name="transferId">The transfer identifier.</param>
-    /// <param name="direction">The transfer direction.</param>
+    /// <param name="mode">The transfer mode.</param>
     /// <param name="metadata">The file metadata.</param>
     /// <param name="remoteEndpoint">The remote endpoint.</param>
     /// <param name="filePath">The local file path used for the transfer.</param>
     public TransferStartedEventArgs(
         Guid transferId,
-        TransferDirection direction,
+        TransferMode mode,
         FileMetadata metadata,
         string remoteEndpoint,
         string filePath
     )
     {
-        TransferId = transferId;
-        Direction = direction;
-        Metadata = metadata;
-        RemoteEndpoint = remoteEndpoint;
-        FilePath = filePath;
+        this.TransferId = transferId;
+        this.Mode = mode;
+        this.Metadata = metadata;
+        this.RemoteEndpoint = remoteEndpoint;
+        this.FilePath = filePath;
     }
 
     /// <summary>
-    /// Gets the transfer identifier.
+    /// The transfer identifier.
     /// </summary>
     public Guid TransferId { get; }
 
     /// <summary>
-    /// Gets the transfer direction.
+    /// The transfer mode.
     /// </summary>
-    public TransferDirection Direction { get; }
+    public TransferMode Mode { get; }
 
     /// <summary>
-    /// Gets the file metadata.
+    /// The file metadata.
     /// </summary>
     public FileMetadata Metadata { get; }
 
     /// <summary>
-    /// Gets the remote endpoint.
+    /// The remote endpoint.
     /// </summary>
     public string RemoteEndpoint { get; }
 
     /// <summary>
-    /// Gets the local file path used for the transfer.
+    /// The local file path used for the transfer.
     /// </summary>
     public string FilePath { get; }
 }

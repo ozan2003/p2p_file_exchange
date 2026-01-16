@@ -1,3 +1,5 @@
+using System;
+
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
@@ -12,17 +14,17 @@ public sealed class TransferProgressEventArgs : EventArgs
     /// <param name="progressPercent">The progress percent.</param>
     public TransferProgressEventArgs(Guid transferId, int progressPercent)
     {
-        TransferId = transferId;
-        ProgressPercent = progressPercent;
+        this.TransferId = transferId;
+        this.ProgressPercent = progressPercent;
     }
 
     /// <summary>
-    /// Gets the transfer identifier.
+    /// The transfer identifier.
     /// </summary>
     public Guid TransferId { get; }
 
     /// <summary>
-    /// Gets the progress percent.
+    /// The progress percent.
     /// </summary>
     public int ProgressPercent { get; }
 }

@@ -6,17 +6,17 @@ namespace P2PFileTransfer.Core.Models;
 public sealed class FileChunk
 {
     /// <summary>
-    /// Gets or sets the zero-based chunk index.
+    /// The zero-based chunk index.
     /// </summary>
     public int ChunkIndex { get; set; }
 
     /// <summary>
-    /// Gets or sets the chunk payload.
+    /// The data being chunked.
     /// </summary>
     public byte[] Data { get; set; } = [];
 
     /// <summary>
-    /// Gets or sets the SHA256 hash of the chunk data.
+    /// The SHA256 hash of the chunk data.
     /// </summary>
     public byte[] Hash { get; set; } = [];
 }

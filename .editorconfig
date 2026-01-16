@@ -62,10 +62,10 @@ dotnet_separate_import_directive_groups = false
 dotnet_sort_system_directives_first = true
 
 # this. and Me. preferences
-dotnet_style_qualification_for_field = false:suggestion
-dotnet_style_qualification_for_property = false:suggestion
-dotnet_style_qualification_for_method = false:suggestion
-dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_qualification_for_field = true:suggestion
+dotnet_style_qualification_for_property = true:suggestion
+dotnet_style_qualification_for_method = true:suggestion
+dotnet_style_qualification_for_event = true:suggestion
 
 # Language keywords vs BCL types preferences
 dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
@@ -211,7 +211,7 @@ csharp_prefer_braces = true:refactoring
 csharp_prefer_simple_using_statement = true
 csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_method_group_conversion = true
-csharp_style_prefer_primary_constructors = true
+csharp_style_prefer_primary_constructors = false
 csharp_style_prefer_top_level_statements = true
 
 # Expression-level preferences

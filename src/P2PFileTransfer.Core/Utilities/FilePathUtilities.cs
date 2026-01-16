@@ -1,3 +1,6 @@
+using System;
+using System.IO;
+
 namespace P2PFileTransfer.Core.Utilities;
 
 /// <summary>
@@ -6,7 +9,7 @@ namespace P2PFileTransfer.Core.Utilities;
 public static class FilePathUtilities
 {
     /// <summary>
-    /// Gets the default download directory for inbound transfers.
+    /// The default download directory for inbound transfers.
     /// </summary>
     public static string GetDefaultDownloadDirectory()
     {
@@ -49,9 +52,9 @@ public static class FilePathUtilities
         {
             candidate = Path.Combine(
                 directory,
-                $"{fileName} ({index}){extension}"
+                $"{fileName}_({index}){extension}"
             );
-            index++;
+            ++index;
         } while (File.Exists(candidate));
 
         return candidate;

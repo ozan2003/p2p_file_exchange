@@ -1,3 +1,4 @@
+using System;
 using System.Net;
 
 namespace P2PFileTransfer.Core.Services;
@@ -8,27 +9,32 @@ namespace P2PFileTransfer.Core.Services;
 public sealed class PeerDiscoveryOptions
 {
     /// <summary>
-    /// Gets or sets the UDP broadcast port.
+    /// The default broadcast port.
     /// </summary>
-    public int BroadcastPort { get; set; } = 37020;
+    private const int DefaultBroadcastPort = 37020;
 
     /// <summary>
-    /// Gets or sets the UDP broadcast address.
+    /// The UDP broadcast port.
+    /// </summary>
+    public int BroadcastPort { get; set; } = DefaultBroadcastPort;
+
+    /// <summary>
+    /// The UDP broadcast address.
     /// </summary>
     public IPAddress BroadcastAddress { get; set; } = IPAddress.Broadcast;
 
     /// <summary>
-    /// Gets or sets the broadcast interval.
+    /// The broadcast interval.
     /// </summary>
     public TimeSpan BroadcastInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
-    /// Gets or sets the peer timeout duration.
+    /// The peer timeout duration.
     /// </summary>
     public TimeSpan PeerTimeout { get; set; } = TimeSpan.FromSeconds(15);
 
     /// <summary>
-    /// Gets or sets the cleanup interval for removing stale peers.
+    /// The cleanup interval for removing stale peers.
     /// </summary>
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromSeconds(5);
 }

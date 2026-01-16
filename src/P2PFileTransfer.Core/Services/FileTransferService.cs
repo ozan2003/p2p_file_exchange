@@ -1,6 +1,10 @@
+using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Threading;
+using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 using P2PFileTransfer.Core.Utilities;
 
@@ -47,10 +51,12 @@ public sealed class FileTransferService : IFileTransferService
             );
         }
 
-        await m_listenerLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await this
+            .m_listenerLock.WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
         try
         {
-            if (m_listener != null)
+            if (this.m_listener != null)
             {
                 return;
             }
@@ -58,56 +64,62 @@ public sealed class FileTransferService : IFileTransferService
             this.m_downloadDirectory = downloadDirectory;
             Directory.CreateDirectory(downloadDirectory);
 
-            m_listener = new TcpListener(IPAddress.Any, port);
-            m_listener.Server.SetSocketOption(
+            this.m_listener = new TcpListener(IPAddress.Any, port);
+            this.m_listener.Server.SetSocketOption(
                 SocketOptionLevel.Socket,
                 SocketOptionName.ReuseAddress,
                 true
             );
-            m_listener.Start();
+            this.m_listener.Start();
 
-            ListenerPort = ((IPEndPoint)m_listener.LocalEndpoint).Port;
-            m_listenerCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken
+            this.ListenerPort = (
+                (IPEndPoint)this.m_listener.LocalEndpoint
+            ).Port;
+            this.m_listenerCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+            this.m_acceptLoopTask = AcceptLoopAsync(
+                this.m_listener,
+                this.m_listenerCts.Token
             );
-            m_acceptLoopTask = AcceptLoopAsync(m_listener, m_listenerCts.Token);
         }
         finally
         {
-            m_listenerLock.Release();
+            this.m_listenerLock.Release();
         }
     }
 
     /// <inheritdoc />
     public async Task StopListenerAsync()
     {
-        await m_listenerLock.WaitAsync().ConfigureAwait(false);
+        await this.m_listenerLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (m_listener == null)
+            if (this.m_listener == null)
             {
                 return;
             }
 
-            m_listenerCts?.Cancel();
-            m_listener.Stop();
+            this.m_listenerCts?.Cancel();
+            this.m_listener.Stop();
 
-            if (m_acceptLoopTask != null)
+            if (this.m_acceptLoopTask != null)
             {
-                await m_acceptLoopTask
-                    .ContinueWith(_ => { })
+                await this
+                    .m_acceptLoopTask.ContinueWith(_ => { })
                     .ConfigureAwait(false);
             }
 
-            m_listenerCts?.Dispose();
-            m_listener = null;
-            m_listenerCts = null;
-            m_acceptLoopTask = null;
-            ListenerPort = 0;
+            this.m_listenerCts?.Dispose();
+            this.m_listener = null;
+            this.m_listenerCts = null;
+            this.m_acceptLoopTask = null;
+            this.ListenerPort = 0;
         }
         finally
         {
-            m_listenerLock.Release();
+            this.m_listenerLock.Release();
         }
     }
 
@@ -143,15 +155,14 @@ public sealed class FileTransferService : IFileTransferService
         }
 
         FileInfo fileInfo = new(filePath);
-        int totalChunks = FileChunker.CalculateTotalChunks(
-            fileInfo.Length,
-            FileChunker.DefaultChunkSize
+        int totalChunks = FileChunker.CalculateTotalChunkNumber(
+            fileInfo.Length
         );
         FileMetadata? metadata = new()
         {
             FileName = Path.GetFileName(filePath),
             FileSize = fileInfo.Length,
-            TotalChunks = totalChunks,
+            TotalChunksNumber = totalChunks,
             ChunkSize = FileChunker.DefaultChunkSize,
         };
 
@@ -160,7 +171,7 @@ public sealed class FileTransferService : IFileTransferService
             this,
             new TransferStartedEventArgs(
                 transferId,
-                TransferDirection.Send,
+                TransferMode.Send,
                 metadata,
                 $"{peer.IPAddress}:{peer.TcpPort}",
                 filePath
@@ -205,7 +216,7 @@ public sealed class FileTransferService : IFileTransferService
                 chunkIndex++;
                 int progressPercent = CalculateProgressPercent(
                     chunkIndex,
-                    metadata.TotalChunks
+                    metadata.TotalChunksNumber
                 );
                 progress?.Report(progressPercent);
                 TransferProgressChanged?.Invoke(
@@ -218,7 +229,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferCompletedEventArgs(
                     transferId,
-                    TransferDirection.Send,
+                    TransferMode.Send,
                     filePath
                 )
             );
@@ -229,7 +240,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferFailedEventArgs(
                     transferId,
-                    TransferDirection.Send,
+                    TransferMode.Send,
                     "Transfer canceled."
                 )
             );
@@ -240,7 +251,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferFailedEventArgs(
                     transferId,
-                    TransferDirection.Send,
+                    TransferMode.Send,
                     $"Transfer failed: {ex.Message}"
                 )
             );
@@ -250,8 +261,8 @@ public sealed class FileTransferService : IFileTransferService
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await StopListenerAsync().ConfigureAwait(false);
-        m_listenerLock.Dispose();
+        await this.StopListenerAsync().ConfigureAwait(false);
+        this.m_listenerLock.Dispose();
     }
 
     private async Task AcceptLoopAsync(
@@ -267,7 +278,7 @@ public sealed class FileTransferService : IFileTransferService
                 client = await tcpListener
                     .AcceptTcpClientAsync(cancellationToken)
                     .ConfigureAwait(false);
-                _ = HandleIncomingAsync(client, cancellationToken);
+                _ = this.HandleIncomingAsync(client, cancellationToken);
             }
             catch (OperationCanceledException)
             {
@@ -308,14 +319,14 @@ public sealed class FileTransferService : IFileTransferService
             string remoteEndpoint =
                 client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
             destinationPath = FilePathUtilities.GetUniquePath(
-                Path.Combine(m_downloadDirectory, metadata.FileName)
+                Path.Combine(this.m_downloadDirectory, metadata.FileName)
             );
 
             TransferStarted?.Invoke(
                 this,
                 new TransferStartedEventArgs(
                     transferId,
-                    TransferDirection.Receive,
+                    TransferMode.Receive,
                     metadata,
                     remoteEndpoint,
                     destinationPath
@@ -333,7 +344,7 @@ public sealed class FileTransferService : IFileTransferService
 
             for (
                 int expectedIndex = 0;
-                expectedIndex < metadata.TotalChunks;
+                expectedIndex < metadata.TotalChunksNumber;
                 expectedIndex++
             )
             {
@@ -358,7 +369,7 @@ public sealed class FileTransferService : IFileTransferService
 
                 int progressPercent = CalculateProgressPercent(
                     expectedIndex + 1,
-                    metadata.TotalChunks
+                    metadata.TotalChunksNumber
                 );
                 TransferProgressChanged?.Invoke(
                     this,
@@ -373,7 +384,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferCompletedEventArgs(
                     transferId,
-                    TransferDirection.Receive,
+                    TransferMode.Receive,
                     destinationPath
                 )
             );
@@ -385,7 +396,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferFailedEventArgs(
                     transferId,
-                    TransferDirection.Receive,
+                    TransferMode.Receive,
                     "Transfer canceled."
                 )
             );
@@ -397,7 +408,7 @@ public sealed class FileTransferService : IFileTransferService
                 this,
                 new TransferFailedEventArgs(
                     transferId,
-                    TransferDirection.Receive,
+                    TransferMode.Receive,
                     $"Transfer failed: {ex.Message}"
                 )
             );

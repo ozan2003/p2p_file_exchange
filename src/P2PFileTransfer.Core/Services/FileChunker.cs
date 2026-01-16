@@ -1,5 +1,9 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
+using System.Threading;
 using P2PFileTransfer.Core.Models;
 
 namespace P2PFileTransfer.Core.Services;
@@ -19,7 +23,10 @@ internal static class FileChunker
     /// </summary>
     /// <param name="fileSize">The file size in bytes.</param>
     /// <param name="chunkSize">The chunk size in bytes.</param>
-    public static int CalculateTotalChunks(long fileSize, int chunkSize)
+    public static int CalculateTotalChunkNumber(
+        long fileSize,
+        int chunkSize = DefaultChunkSize
+    )
     {
         if (chunkSize <= 0)
         {
@@ -46,7 +53,7 @@ internal static class FileChunker
             throw new ArgumentOutOfRangeException(nameof(chunkSize));
         }
 
-        byte[] buffer = new byte[chunkSize];
+        byte[] buffer = new byte[chunkSize]; // Repeteadly fill the chunks to here.
         int chunkIndex = 0;
 
         while (true)
@@ -70,7 +77,7 @@ internal static class FileChunker
                 Hash = hash,
             };
 
-            chunkIndex++;
+            ++chunkIndex;
         }
     }
 }

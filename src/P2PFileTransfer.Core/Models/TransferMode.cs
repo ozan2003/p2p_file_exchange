@@ -1,9 +1,9 @@
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
-/// Indicates the direction of a file transfer.
+/// Indicates the mode of a file transfer.
 /// </summary>
-public enum TransferDirection
+public enum TransferMode
 {
     /// <summary>
     /// Data is being sent to a peer.

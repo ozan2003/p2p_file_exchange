@@ -1,3 +1,5 @@
+using System;
+
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
@@ -9,31 +11,31 @@ public sealed class TransferFailedEventArgs : EventArgs
     /// Initializes a new instance of the <see cref="TransferFailedEventArgs"/> class.
     /// </summary>
     /// <param name="transferId">The transfer identifier.</param>
-    /// <param name="direction">The transfer direction.</param>
+    /// <param name="mode">The transfer mode.</param>
     /// <param name="errorMessage">The error message.</param>
     public TransferFailedEventArgs(
         Guid transferId,
-        TransferDirection direction,
+        TransferMode mode,
         string errorMessage
     )
     {
-        TransferId = transferId;
-        Direction = direction;
-        ErrorMessage = errorMessage;
+        this.TransferId = transferId;
+        this.Mode = mode;
+        this.ErrorMessage = errorMessage;
     }
 
     /// <summary>
-    /// Gets the transfer identifier.
+    /// The transfer identifier.
     /// </summary>
     public Guid TransferId { get; }
 
     /// <summary>
-    /// Gets the transfer direction.
+    /// The transfer mode.
     /// </summary>
-    public TransferDirection Direction { get; }
+    public TransferMode Mode { get; }
 
     /// <summary>
-    /// Gets the error message.
+    /// The error message.
     /// </summary>
     public string ErrorMessage { get; }
 }

@@ -6,22 +6,22 @@ namespace P2PFileTransfer.Core.Models;
 public sealed class FileMetadata
 {
     /// <summary>
-    /// Gets or sets the file name.
+    /// The name of the file.
     /// </summary>
     public string FileName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the file size in bytes.
+    /// The file size in bytes.
     /// </summary>
     public long FileSize { get; set; }
 
     /// <summary>
-    /// Gets or sets the total number of chunks.
+    /// The total number of chunks.
     /// </summary>
-    public int TotalChunks { get; set; }
+    public int TotalChunksNumber { get; set; }
 
     /// <summary>
-    /// Gets or sets the chunk size in bytes.
+    /// The chunk size in bytes.
     /// </summary>
     public int ChunkSize { get; set; }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -10,7 +12,7 @@ namespace P2PFileTransfer.Core.Utilities;
 public static class NetworkUtilities
 {
     /// <summary>
-    /// Gets the local IPv4 addresses for active network interfaces.
+    /// Returns the local IPv4 addresses for active network interfaces.
     /// </summary>
     public static IReadOnlyList<IPAddress> GetLocalIPv4Addresses()
     {
@@ -36,7 +38,7 @@ public static class NetworkUtilities
     }
 
     /// <summary>
-    /// Gets the first available IPv4 address or loopback if none are available.
+    /// Returns the first available IPv4 address or loopback if none are available.
     /// </summary>
     public static IPAddress GetPrimaryIPv4Address()
     {

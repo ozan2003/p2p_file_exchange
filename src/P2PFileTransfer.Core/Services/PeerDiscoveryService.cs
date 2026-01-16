@@ -1,7 +1,12 @@
+using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 using P2PFileTransfer.Core.Utilities;
 
@@ -40,7 +45,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     {
         this.m_options =
             options ?? throw new ArgumentNullException(nameof(options));
-        m_jsonOptions = new JsonSerializerOptions(JsonSerializerDefaults.Web);
+        this.m_jsonOptions = new JsonSerializerOptions(
+            JsonSerializerDefaults.Web
+        );
     }
 
     /// <inheritdoc />
@@ -70,10 +77,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             throw new ArgumentOutOfRangeException(nameof(tcpPort));
         }
 
-        await m_stateLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        await this
+            .m_stateLock.WaitAsync(cancellationToken)
+            .ConfigureAwait(false);
         try
         {
-            if (IsRunning)
+            if (this.IsRunning)
             {
                 return;
             }
@@ -81,56 +90,63 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             this.m_tcpPort = tcpPort;
             this.m_displayName = displayName?.Trim() ?? string.Empty;
 
-            m_discoveryCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken
+            this.m_discoveryCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+            CancellationToken token = this.m_discoveryCts.Token;
+
+            this.m_listenClient = this.CreateListenerClient();
+            this.m_broadcastClient = CreateBroadcastClient();
+
+            this.m_listenTask = this.ListenLoopAsync(
+                this.m_listenClient,
+                token
             );
-            CancellationToken token = m_discoveryCts.Token;
+            this.m_broadcastTask = this.BroadcastLoopAsync(
+                this.m_broadcastClient,
+                token
+            );
+            this.m_cleanupTask = this.CleanupLoopAsync(token);
 
-            m_listenClient = CreateListenerClient();
-            m_broadcastClient = CreateBroadcastClient();
-
-            m_listenTask = ListenLoopAsync(m_listenClient, token);
-            m_broadcastTask = BroadcastLoopAsync(m_broadcastClient, token);
-            m_cleanupTask = CleanupLoopAsync(token);
-
-            IsRunning = true;
+            this.IsRunning = true;
             StatusChanged?.Invoke(this, "Discovery started.");
         }
         finally
         {
-            m_stateLock.Release();
+            this.m_stateLock.Release();
         }
     }
 
     /// <inheritdoc />
     public async Task StopAsync()
     {
-        await m_stateLock.WaitAsync().ConfigureAwait(false);
+        await this.m_stateLock.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!IsRunning)
+            if (!this.IsRunning)
             {
                 return;
             }
 
-            m_discoveryCts?.Cancel();
-            m_listenClient?.Close();
-            m_broadcastClient?.Close();
+            this.m_discoveryCts?.Cancel();
+            this.m_listenClient?.Close();
+            this.m_broadcastClient?.Close();
 
-            List<Task>? tasks = new();
-            if (m_listenTask != null)
+            List<Task> tasks = [];
+            if (this.m_listenTask != null)
             {
-                tasks.Add(m_listenTask);
+                tasks.Add(this.m_listenTask);
             }
 
-            if (m_broadcastTask != null)
+            if (this.m_broadcastTask != null)
             {
-                tasks.Add(m_broadcastTask);
+                tasks.Add(this.m_broadcastTask);
             }
 
-            if (m_cleanupTask != null)
+            if (this.m_cleanupTask != null)
             {
-                tasks.Add(m_cleanupTask);
+                tasks.Add(this.m_cleanupTask);
             }
 
             if (tasks.Count > 0)
@@ -141,23 +157,23 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     .ConfigureAwait(false);
             }
 
-            m_listenClient?.Dispose();
-            m_broadcastClient?.Dispose();
-            m_discoveryCts?.Dispose();
+            this.m_listenClient?.Dispose();
+            this.m_broadcastClient?.Dispose();
+            this.m_discoveryCts?.Dispose();
 
-            m_listenClient = null;
-            m_broadcastClient = null;
-            m_discoveryCts = null;
-            m_listenTask = null;
-            m_broadcastTask = null;
-            m_cleanupTask = null;
+            this.m_listenClient = null;
+            this.m_broadcastClient = null;
+            this.m_discoveryCts = null;
+            this.m_listenTask = null;
+            this.m_broadcastTask = null;
+            this.m_cleanupTask = null;
 
-            IsRunning = false;
+            this.IsRunning = false;
             StatusChanged?.Invoke(this, "Discovery stopped.");
         }
         finally
         {
-            m_stateLock.Release();
+            this.m_stateLock.Release();
         }
     }
 
@@ -170,14 +186,14 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <inheritdoc />
     public IReadOnlyCollection<PeerInfo> GetPeers()
     {
-        return m_peers.Values.ToList();
+        return [.. this.m_peers.Values];
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await StopAsync().ConfigureAwait(false);
-        m_stateLock.Dispose();
+        await this.StopAsync().ConfigureAwait(false);
+        this.m_stateLock.Dispose();
     }
 
     private static string NormalizeDisplayName(string? name)
@@ -187,7 +203,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
     private UdpClient CreateListenerClient()
     {
-        UdpClient? client = new(AddressFamily.InterNetwork)
+        UdpClient client = new(AddressFamily.InterNetwork)
         {
             EnableBroadcast = true,
         };
@@ -199,14 +215,14 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         );
         client.Client.ExclusiveAddressUse = false;
         client.Client.Bind(
-            new IPEndPoint(IPAddress.Any, m_options.BroadcastPort)
+            new IPEndPoint(IPAddress.Any, this.m_options.BroadcastPort)
         );
         return client;
     }
 
     private static UdpClient CreateBroadcastClient()
     {
-        UdpClient? client = new(AddressFamily.InterNetwork)
+        UdpClient client = new(AddressFamily.InterNetwork)
         {
             EnableBroadcast = true,
         };
@@ -224,29 +240,29 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         CancellationToken cancellationToken
     )
     {
-        IPEndPoint? endpoint = new(
-            m_options.BroadcastAddress,
-            m_options.BroadcastPort
+        IPEndPoint endpoint = new(
+            this.m_options.BroadcastAddress,
+            this.m_options.BroadcastPort
         );
-        using PeriodicTimer? timer = new(m_options.BroadcastInterval);
+        using PeriodicTimer timer = new(this.m_options.BroadcastInterval);
 
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                PeerAnnouncement? announcement = new()
+                PeerAnnouncement announcement = new()
                 {
-                    PeerId = LocalPeerId,
-                    DisplayName = NormalizeDisplayName(m_displayName),
+                    PeerId = this.LocalPeerId,
+                    DisplayName = NormalizeDisplayName(this.m_displayName),
                     IPAddress = NetworkUtilities
                         .GetPrimaryIPv4Address()
                         .ToString(),
-                    TcpPort = m_tcpPort,
+                    TcpPort = this.m_tcpPort,
                 };
 
                 byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
                     announcement,
-                    m_jsonOptions
+                    this.m_jsonOptions
                 );
                 await client
                     .SendAsync(payload, payload.Length, endpoint)
@@ -282,10 +298,13 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 PeerAnnouncement? announcement =
                     JsonSerializer.Deserialize<PeerAnnouncement>(
                         result.Buffer,
-                        m_jsonOptions
+                        this.m_jsonOptions
                     );
 
-                if (announcement == null || announcement.PeerId == LocalPeerId)
+                if (
+                    announcement == null
+                    || announcement.PeerId == this.LocalPeerId
+                )
                 {
                     continue;
                 }
@@ -302,7 +321,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     ? result.RemoteEndPoint.Address.ToString()
                     : announcement.IPAddress;
 
-                PeerInfo peerInfo = m_peers.AddOrUpdate(
+                PeerInfo peerInfo = this.m_peers.AddOrUpdate(
                     announcement.PeerId,
                     _ => new PeerInfo
                     {
@@ -352,7 +371,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
     private async Task CleanupLoopAsync(CancellationToken cancellationToken)
     {
-        using PeriodicTimer timer = new(m_options.CleanupInterval);
+        using PeriodicTimer timer = new(this.m_options.CleanupInterval);
         while (
             await timer
                 .WaitForNextTickAsync(cancellationToken)
@@ -361,17 +380,17 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         {
             cancellationToken.ThrowIfCancellationRequested();
             DateTimeOffset expiration =
-                DateTimeOffset.UtcNow - m_options.PeerTimeout;
-            foreach (KeyValuePair<Guid, PeerInfo> peer in m_peers)
+                DateTimeOffset.UtcNow - this.m_options.PeerTimeout;
+            foreach ((Guid key, PeerInfo value) in this.m_peers)
             {
-                if (peer.Value.LastSeen >= expiration)
+                if (value.LastSeen >= expiration)
                 {
                     continue;
                 }
 
-                if (m_peers.TryRemove(peer.Key, out _))
+                if (this.m_peers.TryRemove(key, out _))
                 {
-                    PeerRemoved?.Invoke(this, peer.Key);
+                    PeerRemoved?.Invoke(this, key);
                 }
             }
         }

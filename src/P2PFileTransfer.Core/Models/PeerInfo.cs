@@ -1,3 +1,5 @@
+using System;
+
 namespace P2PFileTransfer.Core.Models;
 
 /// <summary>
@@ -6,27 +8,27 @@ namespace P2PFileTransfer.Core.Models;
 public sealed class PeerInfo
 {
     /// <summary>
-    /// Gets or sets the unique peer identifier.
+    /// The unique UUID of the peer.
     /// </summary>
     public Guid PeerId { get; set; }
 
     /// <summary>
-    /// Gets or sets the display name for the peer.
+    /// The display name for the peer.
     /// </summary>
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the IPv4 address of the peer.
+    /// The IPv4 address of the peer.
     /// </summary>
     public string IPAddress { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets or sets the TCP port used for file transfers.
+    /// The TCP port used for file transfers.
     /// </summary>
     public int TcpPort { get; set; }
 
     /// <summary>
-    /// Gets or sets the last time the peer was seen.
+    /// The last time the peer was seen.
     /// </summary>
     public DateTimeOffset LastSeen { get; set; }
 }
