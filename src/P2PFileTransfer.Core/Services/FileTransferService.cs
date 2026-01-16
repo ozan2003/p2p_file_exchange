@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -15,6 +16,8 @@ namespace P2PFileTransfer.Core.Services;
 /// </summary>
 public sealed class FileTransferService : IFileTransferService
 {
+    private const int DefaultBufferSize = 80 * 1024; // 80 KiB
+
     private readonly SemaphoreSlim m_listenerLock = new(1, 1);
     private TcpListener? m_listener;
     private CancellationTokenSource? m_listenerCts;
@@ -131,10 +134,7 @@ public sealed class FileTransferService : IFileTransferService
         CancellationToken cancellationToken
     )
     {
-        if (peer == null)
-        {
-            throw new ArgumentNullException(nameof(peer));
-        }
+        ArgumentNullException.ThrowIfNull(peer, nameof(peer));
 
         if (string.IsNullOrWhiteSpace(filePath))
         {
@@ -158,7 +158,7 @@ public sealed class FileTransferService : IFileTransferService
         int totalChunks = FileChunker.CalculateTotalChunkNumber(
             fileInfo.Length
         );
-        FileMetadata? metadata = new()
+        FileMetadata metadata = new()
         {
             FileName = Path.GetFileName(filePath),
             FileSize = fileInfo.Length,
@@ -180,7 +180,7 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
-            using TcpClient? client = new();
+            using TcpClient client = new();
             await client
                 .ConnectAsync(remoteAddress, peer.TcpPort, cancellationToken)
                 .ConfigureAwait(false);
@@ -191,29 +191,28 @@ public sealed class FileTransferService : IFileTransferService
                 .WriteMetadataAsync(networkStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
 
-            await using FileStream? fileStream = new(
+            await using FileStream fileStream = new(
                 filePath,
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read,
-                bufferSize: 81920,
+                bufferSize: DefaultBufferSize,
                 useAsync: true
             );
 
             int chunkIndex = 0;
-            await foreach (
-                FileChunk chunk in FileChunker.ReadChunksAsync(
-                    fileStream,
-                    metadata.ChunkSize,
-                    cancellationToken
-                )
-            )
+            IAsyncEnumerable<FileChunk> chunks = FileChunker.ReadChunksAsync(
+                fileStream,
+                metadata.ChunkSize,
+                cancellationToken
+            );
+            await foreach (FileChunk chunk in chunks)
             {
                 await FileTransferProtocol
                     .WriteChunkAsync(networkStream, chunk, cancellationToken)
                     .ConfigureAwait(false);
 
-                chunkIndex++;
+                ++chunkIndex;
                 int progressPercent = CalculateProgressPercent(
                     chunkIndex,
                     metadata.TotalChunksNumber
@@ -333,19 +332,19 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
 
-            await using FileStream? fileStream = new(
+            await using FileStream fileStream = new(
                 destinationPath,
                 FileMode.Create,
                 FileAccess.Write,
                 FileShare.None,
-                bufferSize: 81920,
+                bufferSize: DefaultBufferSize,
                 useAsync: true
             );
 
             for (
                 int expectedIndex = 0;
                 expectedIndex < metadata.TotalChunksNumber;
-                expectedIndex++
+                ++expectedIndex
             )
             {
                 FileChunk chunk = await FileTransferProtocol
