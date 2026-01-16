@@ -415,6 +415,37 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.SetStatusMessage(message);
     }
 
+    /// <summary>
+    /// Sends a file to the selected peer via drag &amp; drop.
+    /// </summary>
+    /// <param name="filePath">The path to the file to send.</param>
+    public async Task SendFileByPathAsync(string filePath)
+    {
+        if (this.SelectedPeer == null)
+        {
+            this.SetStatusMessage("Select a peer first to send files.");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))
+        {
+            this.SetStatusMessage("Invalid file path.");
+            return;
+        }
+
+        this.SetStatusMessage(
+            $"Sending {Path.GetFileName(filePath)} to {this.SelectedPeer.Endpoint}."
+        );
+        await this
+            .m_fileTransferService.SendFileAsync(
+                filePath,
+                this.SelectedPeer.ToPeerInfo(),
+                null,
+                CancellationToken.None
+            )
+            .ConfigureAwait(false);
+    }
+
     private void OnTransferStarted(
         object? sender,
         TransferStartedEventArgs args
@@ -431,6 +462,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 args.TransferId,
                 args.Mode,
                 args.Metadata.FileName,
+                args.Metadata.FileSize,
                 args.RemoteEndpoint
             );
 

@@ -12,6 +12,7 @@ public sealed class PeerItemViewModel : ReactiveObject
     private string m_displayName;
     private string m_ipAddress;
     private int m_tcpPort;
+    private DateTimeOffset m_lastSeen;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PeerItemViewModel"/> class.
@@ -23,6 +24,7 @@ public sealed class PeerItemViewModel : ReactiveObject
         this.m_displayName = peer.DisplayName;
         this.m_ipAddress = peer.IPAddress;
         this.m_tcpPort = peer.TcpPort;
+        this.m_lastSeen = peer.LastSeen;
     }
 
     /// <summary>
@@ -66,9 +68,27 @@ public sealed class PeerItemViewModel : ReactiveObject
     }
 
     /// <summary>
+    /// The last time the peer was seen.
+    /// </summary>
+    public DateTimeOffset LastSeen
+    {
+        get => this.m_lastSeen;
+        set
+        {
+            this.RaiseAndSetIfChanged(ref this.m_lastSeen, value);
+            this.RaisePropertyChanged(nameof(this.LastSeenText));
+        }
+    }
+
+    /// <summary>
     /// The formatted endpoint.
     /// </summary>
     public string Endpoint => $"{this.IPAddress}:{this.TcpPort}";
+
+    /// <summary>
+    /// A human-readable "last seen" text.
+    /// </summary>
+    public string LastSeenText => FormatLastSeen(this.LastSeen);
 
     /// <summary>
     /// Updates the view model from the peer information.
@@ -79,6 +99,7 @@ public sealed class PeerItemViewModel : ReactiveObject
         this.DisplayName = peer.DisplayName;
         this.IPAddress = peer.IPAddress;
         this.TcpPort = peer.TcpPort;
+        this.LastSeen = peer.LastSeen;
     }
 
     /// <summary>
@@ -94,5 +115,27 @@ public sealed class PeerItemViewModel : ReactiveObject
             TcpPort = this.TcpPort,
             LastSeen = DateTimeOffset.UtcNow,
         };
+    }
+
+    private static string FormatLastSeen(DateTimeOffset lastSeen)
+    {
+        TimeSpan elapsed = DateTimeOffset.UtcNow - lastSeen;
+
+        if (elapsed.TotalSeconds < 5)
+        {
+            return "just now";
+        }
+
+        if (elapsed.TotalSeconds < 60)
+        {
+            return $"{(int)elapsed.TotalSeconds}s ago";
+        }
+
+        if (elapsed.TotalMinutes < 60)
+        {
+            return $"{(int)elapsed.TotalMinutes}m ago";
+        }
+
+        return $"{(int)elapsed.TotalHours}h ago";
     }
 }
