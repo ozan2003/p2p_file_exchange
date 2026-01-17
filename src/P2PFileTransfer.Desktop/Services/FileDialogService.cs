@@ -49,23 +49,14 @@ public sealed class FileDialogService : IFileDialogService
     }
 
     /// <inheritdoc />
-    public async Task<bool> ShowTransferConfirmationAsync(
+    public Task<bool> ShowTransferConfirmationAsync(
         string senderName,
         string fileName,
         long fileSize
     )
     {
-        Window? parentWindow = this.m_windowProvider.MainWindow;
-        if (parentWindow == null)
-        {
-            // No window available - reject by default for safety.
-            return false;
-        }
-
         TransferConfirmationDialog dialog = new();
         dialog.SetContent(senderName, fileName, fileSize);
-
-        await dialog.ShowDialog(parentWindow).ConfigureAwait(false);
-        return dialog.IsAccepted;
+        return dialog.ShowAndWaitAsync(this.m_windowProvider.MainWindow);
     }
 }
