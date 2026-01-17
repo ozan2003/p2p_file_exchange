@@ -7,7 +7,8 @@ cross-platform Avalonia desktop UI.
 ## Features
 
 - Automatic peer discovery on the local network
-- Fast file transfers over TCP with chunked SHA-256 validation
+- TLS-encrypted file transfers with certificate pinning
+- Per-chunk SHA-256 integrity validation
 - Drag-and-drop or file picker sending
 - Transfer progress, speed, and ETA tracking
 - Automatic download folder and collision-safe file naming
@@ -48,6 +49,19 @@ Inbound files are saved to:
 > [!NOTE]
 > If discovery or transfers do not work, ensure UDP broadcast and TCP traffic
 > are allowed by your firewall.
+
+## Security
+
+All file transfers use TLS encryption with self-signed certificates. On first
+run, a certificate is generated and saved to:
+
+```text
+~/.config/P2PFileTransfer/peer.pfx    (Linux)
+%APPDATA%\P2PFileTransfer\peer.pfx    (Windows)
+```
+
+Certificate fingerprints are exchanged during peer discovery and verified during
+TLS handshake to prevent man-in-the-middle attacks.
 
 ## Project Layout
 
