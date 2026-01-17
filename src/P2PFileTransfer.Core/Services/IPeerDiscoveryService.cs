@@ -77,4 +77,11 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// <param name="ipAddress">The IP address of the peer.</param>
     /// <returns>The certificate fingerprint, or null if not found.</returns>
     string? GetPeerFingerprintByIPAddress(string ipAddress);
+
+    /// <summary>
+    /// Looks up the display name for a peer by IP address.
+    /// </summary>
+    /// <param name="ipAddress">The IP address of the peer.</param>
+    /// <returns>The display name, or null if not found.</returns>
+    string? GetPeerDisplayNameByIPAddress(string ipAddress);
 }

@@ -12,6 +12,12 @@ namespace P2PFileTransfer.Core.Services;
 public interface IFileTransferService : IAsyncDisposable
 {
     /// <summary>
+    /// Occurs when an incoming transfer request is received and awaits user approval.
+    /// The handler should call <see cref="RespondToTransferRequestAsync"/> to accept or reject.
+    /// </summary>
+    event EventHandler<TransferRequestEventArgs>? TransferRequestReceived;
+
+    /// <summary>
     /// Occurs when a transfer starts.
     /// </summary>
     event EventHandler<TransferStartedEventArgs>? TransferStarted;
@@ -73,4 +79,11 @@ public interface IFileTransferService : IAsyncDisposable
         IProgress<int>? progress,
         CancellationToken cancellationToken
     );
+
+    /// <summary>
+    /// Responds to a pending transfer request by accepting or rejecting it.
+    /// </summary>
+    /// <param name="requestId">The request ID from <see cref="TransferRequestEventArgs"/>.</param>
+    /// <param name="response">The response to send (Accepted or Rejected).</param>
+    void RespondToTransferRequest(Guid requestId, TransferResponse response);
 }

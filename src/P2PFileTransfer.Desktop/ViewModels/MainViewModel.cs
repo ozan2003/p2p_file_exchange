@@ -107,6 +107,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         peerDiscoveryService.PeerRemoved += this.OnPeerRemoved;
         peerDiscoveryService.StatusChanged += this.OnStatusChanged;
 
+        fileTransferService.TransferRequestReceived +=
+            this.OnTransferRequestReceived;
         fileTransferService.TransferStarted += this.OnTransferStarted;
         fileTransferService.TransferProgressChanged +=
             this.OnTransferProgressChanged;
@@ -230,12 +232,13 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
 
             string downloadDirectory =
                 FilePathUtilities.GetDefaultDownloadDirectory();
-            await this
-                .m_fileTransferService.StartListenerAsync(
+            await ((FileTransferService)this.m_fileTransferService)
+                .StartListenerAsync(
                     0, // dynamic port
                     downloadDirectory,
                     this.m_localCertificate,
                     this.m_peerDiscoveryService.GetPeerFingerprintByIPAddress,
+                    this.m_peerDiscoveryService.GetPeerDisplayNameByIPAddress,
                     CancellationToken.None
                 )
                 .ConfigureAwait(false);
@@ -264,6 +267,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService.PeerRemoved -= this.OnPeerRemoved;
         this.m_peerDiscoveryService.StatusChanged -= this.OnStatusChanged;
 
+        this.m_fileTransferService.TransferRequestReceived -=
+            this.OnTransferRequestReceived;
         this.m_fileTransferService.TransferStarted -= this.OnTransferStarted;
         this.m_fileTransferService.TransferProgressChanged -=
             this.OnTransferProgressChanged;
@@ -435,6 +440,41 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private void OnStatusChanged(object? sender, string message)
     {
         this.SetStatusMessage(message);
+    }
+
+    private void OnTransferRequestReceived(
+        object? sender,
+        TransferRequestEventArgs args
+    )
+    {
+        // Show confirmation dialog on UI thread.
+        Dispatcher.UIThread.Post(async () =>
+        {
+            string senderName = args.SenderDisplayName ?? args.RemoteEndpoint;
+            bool accepted = await this
+                .m_fileDialogService.ShowTransferConfirmationAsync(
+                    senderName,
+                    args.Metadata.FileName,
+                    args.Metadata.FileSize
+                )
+                .ConfigureAwait(false);
+
+            TransferResponse response = accepted
+                ? TransferResponse.Accepted
+                : TransferResponse.Rejected;
+
+            this.m_fileTransferService.RespondToTransferRequest(
+                args.RequestId,
+                response
+            );
+
+            if (!accepted)
+            {
+                this.SetStatusMessage(
+                    $"Rejected transfer from {senderName}: {args.Metadata.FileName}."
+                );
+            }
+        });
     }
 
     /// <summary>

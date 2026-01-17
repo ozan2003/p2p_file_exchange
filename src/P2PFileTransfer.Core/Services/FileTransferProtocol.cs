@@ -118,6 +118,51 @@ internal static class FileTransferProtocol
     }
 
     /// <summary>
+    /// Writes a transfer response to the stream.
+    /// </summary>
+    /// <param name="stream">The network stream to write to.</param>
+    /// <param name="response">The transfer response.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    public static async Task WriteResponseAsync(
+        Stream stream,
+        TransferResponse response,
+        CancellationToken cancellationToken
+    )
+    {
+        byte[] buffer = [(byte)response];
+        await stream
+            .WriteAsync(buffer, cancellationToken)
+            .ConfigureAwait(false);
+        await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Reads a transfer response from the stream.
+    /// </summary>
+    /// <param name="stream">The network stream to read from.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <returns>The transfer response from the receiver.</returns>
+    /// <exception cref="InvalidDataException">Thrown when the response is invalid.</exception>
+    public static async Task<TransferResponse> ReadResponseAsync(
+        Stream stream,
+        CancellationToken cancellationToken
+    )
+    {
+        byte[] buffer = await ReadExactAsync(stream, 1, cancellationToken)
+            .ConfigureAwait(false);
+        byte value = buffer[0];
+
+        return value switch
+        {
+            (byte)TransferResponse.Accepted => TransferResponse.Accepted,
+            (byte)TransferResponse.Rejected => TransferResponse.Rejected,
+            _ => throw new InvalidDataException(
+                $"Invalid transfer response value: {value}"
+            ),
+        };
+    }
+
+    /// <summary>
     /// Writes a chunk frame to the stream (index + lengths + data + hash).
     /// </summary>
     /// <param name="stream">The network stream to write to.</param>

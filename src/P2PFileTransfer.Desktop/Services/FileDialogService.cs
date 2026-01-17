@@ -1,7 +1,9 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using P2PFileTransfer.Desktop.Views;
 
 namespace P2PFileTransfer.Desktop.Services;
 
@@ -28,7 +30,7 @@ public sealed class FileDialogService : IFileDialogService
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Avalonia.Controls.Window? window = this.m_windowProvider.MainWindow;
+        Window? window = this.m_windowProvider.MainWindow;
         if (window == null)
         {
             return null;
@@ -44,5 +46,26 @@ public sealed class FileDialogService : IFileDialogService
             await window.StorageProvider.OpenFilePickerAsync(options);
         IStorageFile? file = files.FirstOrDefault();
         return file?.Path.LocalPath;
+    }
+
+    /// <inheritdoc />
+    public async Task<bool> ShowTransferConfirmationAsync(
+        string senderName,
+        string fileName,
+        long fileSize
+    )
+    {
+        Window? parentWindow = this.m_windowProvider.MainWindow;
+        if (parentWindow == null)
+        {
+            // No window available - reject by default for safety.
+            return false;
+        }
+
+        TransferConfirmationDialog dialog = new();
+        dialog.SetContent(senderName, fileName, fileSize);
+
+        await dialog.ShowDialog(parentWindow).ConfigureAwait(false);
+        return dialog.IsAccepted;
     }
 }

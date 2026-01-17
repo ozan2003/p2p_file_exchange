@@ -224,6 +224,33 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
+    public string? GetPeerDisplayNameByIPAddress(string ipAddress)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return null;
+        }
+
+        foreach (PeerInfo peer in this.m_peers.Values)
+        {
+            if (
+                string.Equals(
+                    peer.IPAddress,
+                    ipAddress,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return string.IsNullOrWhiteSpace(peer.DisplayName)
+                    ? null
+                    : peer.DisplayName;
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await this.StopAsync().ConfigureAwait(false);

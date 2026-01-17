@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -22,11 +23,22 @@ public sealed class FileTransferService : IFileTransferService
     private const int DefaultBufferSize = 80 * 1024; // 80 KiB
     private static readonly TimeSpan s_tlsHandshakeTimeout =
         TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan s_transferRequestTimeout =
+        TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// Lock for TCP listener.
     /// </summary>
     private readonly SemaphoreSlim m_listenerLock = new(1, 1);
+
+    /// <summary>
+    /// Pending transfer requests awaiting user response.
+    /// Maps requestId to a TaskCompletionSource that will be completed with the response.
+    /// </summary>
+    private readonly ConcurrentDictionary<
+        Guid,
+        TaskCompletionSource<TransferResponse>
+    > m_pendingRequests = new();
 
     /// <summary>
     /// The TCP listener for file transfers.
@@ -37,6 +49,10 @@ public sealed class FileTransferService : IFileTransferService
     private string m_downloadDirectory = string.Empty;
     private X509Certificate2? m_certificate;
     private Func<string, string?>? m_fingerprintLookup;
+    private Func<string, string?>? m_displayNameLookup;
+
+    /// <inheritdoc />
+    public event EventHandler<TransferRequestEventArgs>? TransferRequestReceived;
 
     /// <inheritdoc />
     public event EventHandler<TransferStartedEventArgs>? TransferStarted;
@@ -59,6 +75,41 @@ public sealed class FileTransferService : IFileTransferService
         string downloadDirectory,
         X509Certificate2 certificate,
         Func<string, string?> fingerprintLookup,
+        CancellationToken cancellationToken
+    )
+    {
+        await this.StartListenerAsync(
+                port,
+                downloadDirectory,
+                certificate,
+                fingerprintLookup,
+                displayNameLookup: null,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Starts the TCP listener for inbound transfers with TLS support.
+    /// </summary>
+    /// <param name="port">The port to listen on. Use 0 for a dynamic port.</param>
+    /// <param name="downloadDirectory">The directory where files are saved.</param>
+    /// <param name="certificate">The local TLS certificate with private key.</param>
+    /// <param name="fingerprintLookup">
+    /// A function to look up expected certificate fingerprints by IP address.
+    /// Returns null if the peer is unknown.
+    /// </param>
+    /// <param name="displayNameLookup">
+    /// A function to look up peer display names by IP address.
+    /// Returns null if the peer is unknown.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    public async Task StartListenerAsync(
+        int port,
+        string downloadDirectory,
+        X509Certificate2 certificate,
+        Func<string, string?> fingerprintLookup,
+        Func<string, string?>? displayNameLookup,
         CancellationToken cancellationToken
     )
     {
@@ -89,6 +140,7 @@ public sealed class FileTransferService : IFileTransferService
             this.m_downloadDirectory = downloadDirectory;
             this.m_certificate = certificate;
             this.m_fingerprintLookup = fingerprintLookup;
+            this.m_displayNameLookup = displayNameLookup;
             Directory.CreateDirectory(downloadDirectory);
 
             this.m_listener = new TcpListener(IPAddress.Any, port);
@@ -140,17 +192,43 @@ public sealed class FileTransferService : IFileTransferService
                     .ConfigureAwait(false);
             }
 
+            // Cancel all pending transfer requests.
+            foreach (var kvp in this.m_pendingRequests)
+            {
+                kvp.Value.TrySetCanceled();
+            }
+
+            this.m_pendingRequests.Clear();
+
             this.m_listenerCts?.Dispose();
             this.m_listener = null;
             this.m_listenerCts = null;
             this.m_acceptLoopTask = null;
             this.m_certificate = null;
             this.m_fingerprintLookup = null;
+            this.m_displayNameLookup = null;
             this.ListenerPort = 0;
         }
         finally
         {
             this.m_listenerLock.Release();
+        }
+    }
+
+    /// <inheritdoc />
+    public void RespondToTransferRequest(
+        Guid requestId,
+        TransferResponse response
+    )
+    {
+        if (
+            this.m_pendingRequests.TryRemove(
+                requestId,
+                out TaskCompletionSource<TransferResponse>? tcs
+            )
+        )
+        {
+            tcs.TrySetResult(response);
         }
     }
 
@@ -248,6 +326,24 @@ public sealed class FileTransferService : IFileTransferService
             await FileTransferProtocol
                 .WriteMetadataAsync(sslStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
+
+            // Wait for the receiver to accept or reject the transfer.
+            TransferResponse response = await FileTransferProtocol
+                .ReadResponseAsync(sslStream, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (response == TransferResponse.Rejected)
+            {
+                TransferFailed?.Invoke(
+                    this,
+                    new TransferFailedEventArgs(
+                        transferId,
+                        TransferMode.Send,
+                        $"Transfer rejected by {peer.DisplayName}."
+                    )
+                );
+                return;
+            }
 
             // Read the file chunks and send them to the peer.
             await using FileStream fileStream = new(
@@ -444,18 +540,18 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
-            using TcpClient _ = client;
+            using TcpClient tcpClient = client;
 
             // Extract remote IP for fingerprint lookup.
-            if (client.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
+            if (tcpClient.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
             {
                 remoteIpAddress = remoteEndPoint.Address.ToString();
             }
 
             string remoteEndpointString =
-                client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
+                tcpClient.Client.RemoteEndPoint?.ToString() ?? "Unknown";
 
-            await using NetworkStream networkStream = client.GetStream();
+            await using NetworkStream networkStream = tcpClient.GetStream();
 
             // Wrap `networkStream` with TLS.
             await using SslStream encryptedStream = new(
@@ -488,6 +584,65 @@ public sealed class FileTransferService : IFileTransferService
                 .ConfigureAwait(false);
 
             metadata.FileName = SanitizeFileName(metadata.FileName);
+
+            // Look up the sender's display name if available.
+            string? senderDisplayName = this.m_displayNameLookup?.Invoke(
+                remoteIpAddress
+            );
+
+            // Raise the transfer request event and wait for user decision.
+            Guid requestId = transferId;
+            TaskCompletionSource<TransferResponse> responseTcs = new();
+            this.m_pendingRequests[requestId] = responseTcs;
+
+            TransferRequestReceived?.Invoke(
+                this,
+                new TransferRequestEventArgs(
+                    requestId,
+                    metadata,
+                    remoteEndpointString,
+                    senderDisplayName
+                )
+            );
+
+            // Wait for user response with timeout.
+            using CancellationTokenSource timeoutCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+            timeoutCts.CancelAfter(s_transferRequestTimeout);
+
+            TransferResponse userResponse;
+            try
+            {
+                userResponse = await responseTcs
+                    .Task.WaitAsync(timeoutCts.Token)
+                    .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout or cancellation - reject the transfer.
+                this.m_pendingRequests.TryRemove(
+                    requestId,
+                    out TaskCompletionSource<TransferResponse>? _
+                );
+                userResponse = TransferResponse.Rejected;
+            }
+
+            // Send the response back to the sender.
+            await FileTransferProtocol
+                .WriteResponseAsync(
+                    encryptedStream,
+                    userResponse,
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+
+            if (userResponse == TransferResponse.Rejected)
+            {
+                // User rejected - nothing more to do.
+                return;
+            }
 
             // Set up the destination path for the received file.
             destinationPath = FilePathUtilities.GetUniquePath(
