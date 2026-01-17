@@ -29,6 +29,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     private Task? m_listenTask;
     private Task? m_cleanupTask;
     private string m_displayName = string.Empty;
+    private string m_certificateFingerprint = string.Empty;
     private int m_tcpPort;
 
     /// <summary>
@@ -72,6 +73,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     public async Task StartAsync(
         int tcpPort,
         string displayName,
+        string certificateFingerprint,
         CancellationToken cancellationToken
     )
     {
@@ -92,6 +94,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
             this.m_tcpPort = tcpPort;
             this.m_displayName = displayName?.Trim() ?? string.Empty;
+            this.m_certificateFingerprint =
+                certificateFingerprint ?? string.Empty;
 
             this.m_discoveryCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
@@ -193,6 +197,33 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
+    public string? GetPeerFingerprintByIPAddress(string ipAddress)
+    {
+        if (string.IsNullOrWhiteSpace(ipAddress))
+        {
+            return null;
+        }
+
+        foreach (PeerInfo peer in this.m_peers.Values)
+        {
+            if (
+                string.Equals(
+                    peer.IPAddress,
+                    ipAddress,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            {
+                return string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
+                    ? null
+                    : peer.CertificateFingerprint;
+            }
+        }
+
+        return null;
+    }
+
+    /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
         await this.StopAsync().ConfigureAwait(false);
@@ -281,6 +312,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         .GetPrimaryIPv4Address()
                         .ToString(),
                     TcpPort = this.m_tcpPort,
+                    // The fingerprint is included in every announcement.
+                    CertificateFingerprint = this.m_certificateFingerprint,
                 };
 
                 byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
@@ -371,6 +404,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         IPAddress = ipAddress,
                         TcpPort = announcement.TcpPort,
                         LastSeen = now,
+                        CertificateFingerprint =
+                            announcement.CertificateFingerprint ?? string.Empty,
                     },
                     // Update existing peer info otherwise.
                     (_, existing) =>
@@ -381,6 +416,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         existing.IPAddress = ipAddress;
                         existing.TcpPort = announcement.TcpPort;
                         existing.LastSeen = now;
+                        existing.CertificateFingerprint =
+                            announcement.CertificateFingerprint ?? string.Empty;
                         return existing;
                     }
                 );
@@ -458,5 +495,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         public string IPAddress { get; set; } = string.Empty;
 
         public int TcpPort { get; set; }
+
+        public string CertificateFingerprint { get; set; } = string.Empty;
     }
 }

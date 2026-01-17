@@ -31,4 +31,10 @@ public sealed class PeerInfo
     /// The last time the peer was seen.
     /// </summary>
     public DateTimeOffset LastSeen { get; set; }
+
+    /// <summary>
+    /// The SHA-256 fingerprint of the peer's TLS certificate (hex string).
+    /// Used for certificate pinning during TLS handshake validation.
+    /// </summary>
+    public string CertificateFingerprint { get; set; } = string.Empty;
 }

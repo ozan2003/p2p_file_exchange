@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
@@ -17,6 +20,8 @@ namespace P2PFileTransfer.Core.Services;
 public sealed class FileTransferService : IFileTransferService
 {
     private const int DefaultBufferSize = 80 * 1024; // 80 KiB
+    private static readonly TimeSpan s_tlsHandshakeTimeout =
+        TimeSpan.FromSeconds(10);
 
     /// <summary>
     /// Lock for TCP listener.
@@ -30,6 +35,8 @@ public sealed class FileTransferService : IFileTransferService
     private CancellationTokenSource? m_listenerCts;
     private Task? m_acceptLoopTask;
     private string m_downloadDirectory = string.Empty;
+    private X509Certificate2? m_certificate;
+    private Func<string, string?>? m_fingerprintLookup;
 
     /// <inheritdoc />
     public event EventHandler<TransferStartedEventArgs>? TransferStarted;
@@ -50,6 +57,8 @@ public sealed class FileTransferService : IFileTransferService
     public async Task StartListenerAsync(
         int port,
         string downloadDirectory,
+        X509Certificate2 certificate,
+        Func<string, string?> fingerprintLookup,
         CancellationToken cancellationToken
     )
     {
@@ -60,6 +69,12 @@ public sealed class FileTransferService : IFileTransferService
                 nameof(downloadDirectory)
             );
         }
+
+        ArgumentNullException.ThrowIfNull(certificate, nameof(certificate));
+        ArgumentNullException.ThrowIfNull(
+            fingerprintLookup,
+            nameof(fingerprintLookup)
+        );
 
         await this
             .m_listenerLock.WaitAsync(cancellationToken)
@@ -72,6 +87,8 @@ public sealed class FileTransferService : IFileTransferService
             }
 
             this.m_downloadDirectory = downloadDirectory;
+            this.m_certificate = certificate;
+            this.m_fingerprintLookup = fingerprintLookup;
             Directory.CreateDirectory(downloadDirectory);
 
             this.m_listener = new TcpListener(IPAddress.Any, port);
@@ -127,6 +144,8 @@ public sealed class FileTransferService : IFileTransferService
             this.m_listener = null;
             this.m_listenerCts = null;
             this.m_acceptLoopTask = null;
+            this.m_certificate = null;
+            this.m_fingerprintLookup = null;
             this.ListenerPort = 0;
         }
         finally
@@ -195,10 +214,39 @@ public sealed class FileTransferService : IFileTransferService
                 .ConfigureAwait(false);
             client.NoDelay = true;
 
-            // Send metadata to the peer.
             await using NetworkStream networkStream = client.GetStream();
+
+            // Set up TLS with certificate pinning validation.
+            await using SslStream sslStream = new(
+                networkStream,
+                leaveInnerStreamOpen: false,
+                userCertificateValidationCallback: (_, certificate, _, _) =>
+                    ValidatePeerCertificate(certificate, peer)
+            );
+
+            // Authenticate as client with timeout.
+            using CancellationTokenSource tlsTimeoutCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+            tlsTimeoutCts.CancelAfter(s_tlsHandshakeTimeout);
+
+            await sslStream
+                .AuthenticateAsClientAsync(
+                    new SslClientAuthenticationOptions
+                    {
+                        TargetHost = peer.DisplayName,
+                        ClientCertificates = null,
+                        CertificateRevocationCheckMode =
+                            X509RevocationMode.NoCheck,
+                    },
+                    tlsTimeoutCts.Token
+                )
+                .ConfigureAwait(false);
+
+            // Send metadata to the peer over TLS.
             await FileTransferProtocol
-                .WriteMetadataAsync(networkStream, metadata, cancellationToken)
+                .WriteMetadataAsync(sslStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
 
             // Read the file chunks and send them to the peer.
@@ -220,7 +268,7 @@ public sealed class FileTransferService : IFileTransferService
             await foreach (FileChunk chunk in chunks)
             {
                 await FileTransferProtocol
-                    .WriteChunkAsync(networkStream, chunk, cancellationToken)
+                    .WriteChunkAsync(sslStream, chunk, cancellationToken)
                     .ConfigureAwait(false);
 
                 ++chunkIndex;
@@ -243,6 +291,17 @@ public sealed class FileTransferService : IFileTransferService
                     transferId,
                     TransferMode.Send,
                     filePath
+                )
+            );
+        }
+        catch (AuthenticationException)
+        {
+            TransferFailed?.Invoke(
+                this,
+                new TransferFailedEventArgs(
+                    transferId,
+                    TransferMode.Send,
+                    $"Failed to establish secure connection with {peer.DisplayName}. Certificate verification failed."
                 )
             );
         }
@@ -270,6 +329,55 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
         }
+    }
+
+    /// <summary>
+    /// Validates the peer's certificate by comparing its SHA-256 fingerprint
+    /// against the expected fingerprint from PeerInfo.
+    /// </summary>
+    /// <param name="certificate">The certificate presented by the peer.</param>
+    /// <param name="peer">The target peer with expected fingerprint.</param>
+    /// <returns>True if the certificate matches; otherwise, false.</returns>
+    private static bool ValidatePeerCertificate(
+        X509Certificate? certificate,
+        PeerInfo peer
+    )
+    {
+        if (certificate == null)
+        {
+            return false;
+        }
+
+        // Compute the SHA-256 fingerprint of the presented certificate.
+        byte[] certBytes = certificate.GetRawCertData();
+        byte[] hashBytes = SHA256.HashData(certBytes);
+        string presentedFingerprint = Convert.ToHexString(hashBytes);
+
+        // Get expected fingerprint from peer info.
+        string expectedFingerprint = peer.CertificateFingerprint;
+
+        // If no expected fingerprint is known, allow the connection.
+        if (string.IsNullOrWhiteSpace(expectedFingerprint))
+        {
+            return true;
+        }
+
+        // Compare fingerprints (case-insensitive).
+        bool isValid = string.Equals(
+            presentedFingerprint,
+            expectedFingerprint,
+            StringComparison.OrdinalIgnoreCase
+        );
+
+        if (!isValid)
+        {
+            // Log possible MITM attack.
+            Console.Error.WriteLine(
+                $"[SECURITY] Possible MITM attack detected for peer {peer.DisplayName} ({peer.IPAddress}): expected fingerprint {expectedFingerprint}, got {presentedFingerprint}"
+            );
+        }
+
+        return isValid;
     }
 
     /// <inheritdoc />
@@ -318,8 +426,8 @@ public sealed class FileTransferService : IFileTransferService
     }
 
     /// <summary>
-    /// Handles an incoming file transfer connection. Reads metadata and chunks from the
-    /// network stream, verifies chunk integrity via SHA256, and writes data to disk.
+    /// Handles an incoming file transfer connection with TLS. Reads metadata and chunks from the
+    /// SSL stream, verifies chunk integrity via SHA256, and writes data to disk.
     /// Deletes partial files on failure or cancellation.
     /// </summary>
     /// <param name="client">The accepted TCP client connection.</param>
@@ -332,20 +440,55 @@ public sealed class FileTransferService : IFileTransferService
         Guid transferId = Guid.NewGuid();
         string destinationPath = string.Empty;
         bool shouldDeleteFile = false;
+        string remoteIpAddress = string.Empty;
 
         try
         {
-            // Set up the network stream for the incoming connection.
             using TcpClient _ = client;
+
+            // Extract remote IP for fingerprint lookup.
+            if (client.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
+            {
+                remoteIpAddress = remoteEndPoint.Address.ToString();
+            }
+
+            string remoteEndpointString =
+                client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
+
             await using NetworkStream networkStream = client.GetStream();
+
+            // Wrap `networkStream` with TLS.
+            await using SslStream encryptedStream = new(
+                networkStream,
+                leaveInnerStreamOpen: false,
+                userCertificateValidationCallback: (_, certificate, _, _) =>
+                    this.ValidateRemoteCertificate(
+                        certificate,
+                        remoteIpAddress,
+                        remoteEndpointString
+                    )
+            );
+
+            // Authenticate as server with our certificate.
+            await encryptedStream
+                .AuthenticateAsServerAsync(
+                    new SslServerAuthenticationOptions
+                    {
+                        ServerCertificate = this.m_certificate,
+                        ClientCertificateRequired = false,
+                        CertificateRevocationCheckMode =
+                            X509RevocationMode.NoCheck,
+                    },
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+
             FileMetadata metadata = await FileTransferProtocol
-                .ReadMetadataAsync(networkStream, cancellationToken)
+                .ReadMetadataAsync(encryptedStream, cancellationToken)
                 .ConfigureAwait(false);
 
             metadata.FileName = SanitizeFileName(metadata.FileName);
 
-            string remoteEndpoint =
-                client.Client.RemoteEndPoint?.ToString() ?? "Unknown";
             // Set up the destination path for the received file.
             destinationPath = FilePathUtilities.GetUniquePath(
                 Path.Combine(this.m_downloadDirectory, metadata.FileName)
@@ -357,7 +500,7 @@ public sealed class FileTransferService : IFileTransferService
                     transferId,
                     TransferMode.Receive,
                     metadata,
-                    remoteEndpoint,
+                    remoteEndpointString,
                     destinationPath
                 )
             );
@@ -378,7 +521,7 @@ public sealed class FileTransferService : IFileTransferService
             )
             {
                 FileChunk chunk = await FileTransferProtocol
-                    .ReadChunkAsync(networkStream, cancellationToken)
+                    .ReadChunkAsync(encryptedStream, cancellationToken)
                     .ConfigureAwait(false);
 
                 // Match the chunk index.
@@ -420,6 +563,18 @@ public sealed class FileTransferService : IFileTransferService
                     transferId,
                     TransferMode.Receive,
                     destinationPath
+                )
+            );
+        }
+        catch (AuthenticationException ex)
+        {
+            shouldDeleteFile = true;
+            TransferFailed?.Invoke(
+                this,
+                new TransferFailedEventArgs(
+                    transferId,
+                    TransferMode.Receive,
+                    $"TLS authentication failed: {ex.Message}"
                 )
             );
         }
@@ -467,6 +622,65 @@ public sealed class FileTransferService : IFileTransferService
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// Validates the remote peer's certificate by comparing its SHA-256 fingerprint
+    /// against the expected fingerprint from peer discovery.
+    /// </summary>
+    /// <param name="certificate">The certificate presented by the remote peer.</param>
+    /// <param name="remoteIpAddress">The IP address of the remote peer.</param>
+    /// <param name="remoteEndpoint">The full remote endpoint string for logging.</param>
+    /// <returns>True if the certificate is valid; otherwise, false.</returns>
+    private bool ValidateRemoteCertificate(
+        X509Certificate? certificate,
+        string remoteIpAddress,
+        string remoteEndpoint
+    )
+    {
+        // If no certificate is presented, allow (server mode with ClientCertificateRequired=false).
+        if (certificate == null)
+        {
+            return true;
+        }
+
+        // Compute the SHA-256 fingerprint of the presented certificate.
+        byte[] certBytes = certificate.GetRawCertData();
+        byte[] hashBytes = SHA256.HashData(certBytes);
+        string presentedFingerprint = Convert.ToHexString(hashBytes);
+
+        // Look up the expected fingerprint for this peer.
+        string? expectedFingerprint = this.m_fingerprintLookup?.Invoke(
+            remoteIpAddress
+        );
+
+        // If no expected fingerprint is known, allow the connection (unknown peer).
+        if (string.IsNullOrWhiteSpace(expectedFingerprint))
+        {
+            return true;
+        }
+
+        // Compare fingerprints (case-insensitive).
+        bool isValid = string.Equals(
+            presentedFingerprint,
+            expectedFingerprint,
+            StringComparison.OrdinalIgnoreCase
+        );
+
+        if (!isValid)
+        {
+            // Log rejection reason via TransferFailed event with a temporary ID.
+            TransferFailed?.Invoke(
+                this,
+                new TransferFailedEventArgs(
+                    Guid.Empty,
+                    TransferMode.Receive,
+                    $"Certificate validation failed for {remoteEndpoint}: {expectedFingerprint}, got {presentedFingerprint}"
+                )
+            );
+        }
+
+        return isValid;
     }
 
     /// <summary>

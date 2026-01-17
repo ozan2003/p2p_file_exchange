@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
@@ -21,15 +22,20 @@ namespace P2PFileTransfer.Desktop.ViewModels;
 public sealed class MainViewModel : ReactiveObject, IDisposable
 {
     private const int MaxDisplayNameLength = 64;
+    private const string DefaultCertificatePassword = "p2p-file-transfer";
     private static readonly TimeSpan s_transferRemovalDelay =
         TimeSpan.FromSeconds(5);
 
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
+    private readonly CertificateManager m_certificateManager;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
     [];
+
+    private X509Certificate2? m_localCertificate;
+    private string m_localFingerprint = string.Empty;
 
     private string m_displayName;
     private string m_statusMessage = "Ready.";
@@ -53,6 +59,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService = peerDiscoveryService;
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
+        this.m_certificateManager = new CertificateManager();
 
         this.m_displayName = GetDefaultDisplayName();
 
@@ -211,12 +218,24 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     {
         try
         {
+            // Load or create the local TLS certificate.
+            this.m_localCertificate =
+                this.m_certificateManager.GetOrCreateDefaultCertificate(
+                    DefaultCertificatePassword
+                );
+            this.m_localFingerprint =
+                this.m_certificateManager.GetCertificateFingerprint(
+                    this.m_localCertificate
+                );
+
             string downloadDirectory =
                 FilePathUtilities.GetDefaultDownloadDirectory();
             await this
                 .m_fileTransferService.StartListenerAsync(
                     0, // dynamic port
                     downloadDirectory,
+                    this.m_localCertificate,
+                    this.m_peerDiscoveryService.GetPeerFingerprintByIPAddress,
                     CancellationToken.None
                 )
                 .ConfigureAwait(false);
@@ -256,6 +275,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.StopDiscoveryCommand.Dispose();
         this.SendFileCommand.Dispose();
         this.ClearCompletedTransfersCommand.Dispose();
+
+        this.m_localCertificate?.Dispose();
     }
 
     private static string SanitizeDisplayName(string value)
@@ -289,6 +310,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 .m_peerDiscoveryService.StartAsync(
                     this.m_fileTransferService.ListenerPort,
                     this.DisplayName,
+                    this.m_localFingerprint,
                     CancellationToken.None
                 )
                 .ConfigureAwait(false);

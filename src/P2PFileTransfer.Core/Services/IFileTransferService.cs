@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
@@ -36,14 +37,21 @@ public interface IFileTransferService : IAsyncDisposable
     int ListenerPort { get; }
 
     /// <summary>
-    /// Starts the TCP listener for inbound transfers.
+    /// Starts the TCP listener for inbound transfers with TLS support.
     /// </summary>
     /// <param name="port">The port to listen on. Use 0 for a dynamic port.</param>
     /// <param name="downloadDirectory">The directory where files are saved.</param>
+    /// <param name="certificate">The local TLS certificate with private key.</param>
+    /// <param name="fingerprintLookup">
+    /// A function to look up expected certificate fingerprints by IP address.
+    /// Returns null if the peer is unknown.
+    /// </param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartListenerAsync(
         int port,
         string downloadDirectory,
+        X509Certificate2 certificate,
+        Func<string, string?> fingerprintLookup,
         CancellationToken cancellationToken
     );
 

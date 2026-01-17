@@ -42,14 +42,16 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     int BroadcastPort { get; }
 
     /// <summary>
-    /// Starts discovery with the provided TCP listener port and display name for broadcasting.
+    /// Starts discovery with the provided TCP listener port, display name, and certificate fingerprint for broadcasting.
     /// </summary>
     /// <param name="tcpPort">The TCP port used for file transfers.</param>
     /// <param name="displayName">The display name for the local peer.</param>
+    /// <param name="certificateFingerprint">The SHA-256 fingerprint of the local TLS certificate.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
         int tcpPort,
         string displayName,
+        string certificateFingerprint,
         CancellationToken cancellationToken
     );
 
@@ -68,4 +70,11 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// The currently discovered peers.
     /// </summary>
     IReadOnlyCollection<PeerInfo> GetPeers();
+
+    /// <summary>
+    /// Looks up the expected certificate fingerprint for a peer by IP address.
+    /// </summary>
+    /// <param name="ipAddress">The IP address of the peer.</param>
+    /// <returns>The certificate fingerprint, or null if not found.</returns>
+    string? GetPeerFingerprintByIPAddress(string ipAddress);
 }

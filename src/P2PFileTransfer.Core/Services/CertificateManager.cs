@@ -35,6 +35,7 @@ public sealed class CertificateManager
         string commonName = ResolveCommonName();
         using RSA rsa = RSA.Create();
         rsa.KeySize = RsaKeySize;
+
         CertificateRequest certificateRequest = new(
             $"CN={commonName}",
             rsa,
@@ -145,11 +146,11 @@ public sealed class CertificateManager
         string certificatePath = DefaultCertificatePath;
         if (File.Exists(certificatePath))
         {
-            return LoadCertificate(certificatePath, password);
+            return this.LoadCertificate(certificatePath, password);
         }
 
-        X509Certificate2 certificate = GenerateSelfSignedCertificate();
-        SaveCertificate(certificate, certificatePath, password);
+        X509Certificate2 certificate = this.GenerateSelfSignedCertificate();
+        this.SaveCertificate(certificate, certificatePath, password);
         return certificate;
     }
 
