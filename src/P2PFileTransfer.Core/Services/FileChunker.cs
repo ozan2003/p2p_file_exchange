@@ -58,16 +58,32 @@ internal static class FileChunker
 
         while (true)
         {
-            int bytesRead = await stream
-                .ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
-                .ConfigureAwait(false);
-
-            if (bytesRead == 0)
+            // Fill each chunks completely.
+            int totalRead = 0;
+            while (totalRead < chunkSize)
             {
+                int bytesRead = await stream
+                    .ReadAsync(
+                        buffer.AsMemory(totalRead, chunkSize - totalRead),
+                        cancellationToken
+                    )
+                    .ConfigureAwait(false);
+
+                if (bytesRead == 0)
+                {
+                    break; // End of stream
+                }
+
+                totalRead += bytesRead;
+            }
+
+            if (totalRead == 0)
+            {
+                // Stream is exhausted.
                 yield break;
             }
 
-            byte[] chunkData = buffer.AsSpan(0, bytesRead).ToArray();
+            byte[] chunkData = buffer.AsSpan(0, totalRead).ToArray();
             byte[] hash = SHA256.HashData(chunkData);
 
             yield return new FileChunk
