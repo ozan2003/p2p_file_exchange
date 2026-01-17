@@ -241,6 +241,28 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <summary>
+    /// Validates that a certificate fingerprint is a valid SHA-256 hex string (64 characters).
+    /// </summary>
+    /// <param name="fingerprint">The fingerprint to validate.</param>
+    /// <returns>True if the fingerprint is valid; otherwise, false.</returns>
+    private static bool IsValidCertificateFingerprint(string? fingerprint)
+    {
+        if (string.IsNullOrWhiteSpace(fingerprint))
+        {
+            return false;
+        }
+
+        // SHA-256 produces 32 bytes = 64 hex characters.
+        if (fingerprint.Length != 64)
+        {
+            return false;
+        }
+
+        // Verify all characters are valid hex digits.
+        return fingerprint.All(char.IsAsciiHexDigit);
+    }
+
+    /// <summary>
     /// Creates and configures a UDP client for listening to peer announcements.
     /// Binds to the configured broadcast port with address reuse enabled.
     /// </summary>
@@ -375,6 +397,16 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 }
 
                 if (announcement.TcpPort <= 0)
+                {
+                    continue;
+                }
+
+                // Ignore announcements without valid certificate fingerprint (SHA-256 = 64 hex chars).
+                if (
+                    !IsValidCertificateFingerprint(
+                        announcement.CertificateFingerprint
+                    )
+                )
                 {
                     continue;
                 }
