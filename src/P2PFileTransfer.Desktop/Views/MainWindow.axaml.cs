@@ -72,4 +72,15 @@ public partial class MainWindow : Window
             }
         }
     }
+
+    private void OnRemoveTransferClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (sender is Button button && button.Tag is Guid transferId)
+        {
+            if (this.DataContext is MainViewModel viewModel)
+            {
+                viewModel.RemoveTransfer(transferId);
+            }
+        }
+    }
 }

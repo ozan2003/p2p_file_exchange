@@ -23,8 +23,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
 {
     private const int MaxDisplayNameLength = 64;
     private const string DefaultCertificatePassword = "p2p-file-transfer";
-    private static readonly TimeSpan s_transferRemovalDelay =
-        TimeSpan.FromSeconds(5);
 
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
@@ -97,10 +95,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.SendFileCommand = ReactiveCommand.CreateFromTask(
             this.SendFileAsync,
             canSendFile
-        );
-
-        this.ClearCompletedTransfersCommand = ReactiveCommand.Create(
-            this.ClearCompletedTransfers
         );
 
         peerDiscoveryService.PeerUpdated += this.OnPeerUpdated;
@@ -209,11 +203,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     public ReactiveCommand<Unit, Unit> SendFileCommand { get; }
 
     /// <summary>
-    /// The command to clear completed transfers.
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> ClearCompletedTransfersCommand { get; }
-
-    /// <summary>
     /// Initializes the background services.
     /// </summary>
     public async Task InitializeAsync()
@@ -279,7 +268,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.StartDiscoveryCommand.Dispose();
         this.StopDiscoveryCommand.Dispose();
         this.SendFileCommand.Dispose();
-        this.ClearCompletedTransfersCommand.Dispose();
 
         this.m_localCertificate?.Dispose();
     }
@@ -374,20 +362,20 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             .ConfigureAwait(false);
     }
 
-    private void ClearCompletedTransfers()
+    /// <summary>
+    /// Removes a transfer from the list by its ID.
+    /// </summary>
+    /// <param name="transferId">The transfer ID to remove.</param>
+    public void RemoveTransfer(Guid transferId)
     {
-        List<TransferItemViewModel> toRemove = [];
-        foreach (TransferItemViewModel transfer in this.Transfers)
+        if (
+            this.m_transferLookup.TryGetValue(
+                transferId,
+                out TransferItemViewModel? transfer
+            )
+        )
         {
-            if (transfer.IsFinished)
-            {
-                toRemove.Add(transfer);
-            }
-        }
-
-        foreach (TransferItemViewModel transfer in toRemove)
-        {
-            this.m_transferLookup.Remove(transfer.TransferId);
+            this.m_transferLookup.Remove(transferId);
             this.Transfers.Remove(transfer);
         }
     }
@@ -567,7 +555,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             )
             {
                 transfer.MarkCompleted();
-                this.ScheduleTransferRemoval(args.TransferId);
             }
 
             this.StatusMessage =
@@ -587,31 +574,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             )
             {
                 transfer.MarkFailed(args.ErrorMessage);
-                this.ScheduleTransferRemoval(args.TransferId);
             }
 
             this.StatusMessage = args.ErrorMessage;
-        });
-    }
-
-    private void ScheduleTransferRemoval(Guid transferId)
-    {
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(s_transferRemovalDelay).ConfigureAwait(false);
-            Dispatcher.UIThread.Post(() =>
-            {
-                if (
-                    this.m_transferLookup.TryGetValue(
-                        transferId,
-                        out TransferItemViewModel? transfer
-                    )
-                )
-                {
-                    this.m_transferLookup.Remove(transferId);
-                    this.Transfers.Remove(transfer);
-                }
-            });
         });
     }
 
