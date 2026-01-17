@@ -161,12 +161,18 @@
                                                     ToolTip.Tip="Remove transfer" />
                                         </Grid>
 
-                                        <!-- Row 1: Remote Endpoint -->
-                                        <TextBlock Grid.Row="1"
-                                                   Text="{Binding RemoteEndpoint}"
-                                                   FontSize="11"
-                                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
-                                                   Margin="0,2,0,6" />
+                                        <!-- Row 1: Remote Endpoint and Timestamp -->
+                                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,2,0,6">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding RemoteEndpoint}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding StartedAtText}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                                       Margin="12,0,0,0" />
+                                        </Grid>
 
                                         <!-- Row 2: Progress Bar -->
                                         <ProgressBar Grid.Row="2"

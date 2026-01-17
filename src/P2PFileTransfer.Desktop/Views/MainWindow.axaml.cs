@@ -73,7 +73,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnRemoveTransferClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OnRemoveTransferClick(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e
+    )
     {
         if (sender is Button button && button.Tag is Guid transferId)
         {

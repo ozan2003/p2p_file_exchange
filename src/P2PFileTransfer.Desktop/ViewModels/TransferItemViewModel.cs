@@ -23,6 +23,7 @@ public sealed class TransferItemViewModel : ReactiveObject
     private readonly Stopwatch m_stopwatch;
     private readonly long m_totalBytes;
 
+    private DateTimeOffset? m_startedAt;
     private int m_progressPercent;
     private long m_bytesTransferred;
     private string m_statusText;
@@ -52,10 +53,10 @@ public sealed class TransferItemViewModel : ReactiveObject
         this.FileName = fileName;
         this.m_totalBytes = totalBytes;
         this.RemoteEndpoint = remoteEndpoint;
-        this.m_statusText = "Starting...";
+        this.m_statusText = "Waiting...";
         this.m_speedText = string.Empty;
         this.m_etaText = string.Empty;
-        this.m_stopwatch = Stopwatch.StartNew();
+        this.m_stopwatch = new Stopwatch();
     }
 
     /// <summary>
@@ -93,6 +94,15 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// </summary>
     public string ModeLabel =>
         this.Mode == TransferMode.Send ? "Sending" : "Receiving";
+
+    /// <summary>
+    /// The timestamp when the transfer was accepted.
+    /// </summary>
+    public string StartedAtText =>
+        this.m_startedAt?.ToString(
+            "yyyy-MM-ddTHH:mm:ssK",
+            CultureInfo.InvariantCulture
+        ) ?? string.Empty;
 
     /// <summary>
     /// The progress percent.
@@ -174,6 +184,14 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// <param name="progress">The progress percent.</param>
     public void UpdateProgress(int progress)
     {
+        // Capture timestamp and start stopwatch on first progress (transfer accepted).
+        if (!this.m_startedAt.HasValue)
+        {
+            this.m_startedAt = DateTimeOffset.Now;
+            this.m_stopwatch.Start();
+            this.RaisePropertyChanged(nameof(this.StartedAtText));
+        }
+
         this.ProgressPercent = progress;
 
         // Calculate bytes transferred from percentage
