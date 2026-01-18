@@ -1,8 +1,8 @@
 # P2P File Exchange
 
 Peer-to-peer file transfer app for local networks. It discovers peers via UDP
-broadcast and sends files over TCP with per-chunk integrity checks, all from a
-cross-platform Avalonia desktop UI.
+broadcast and sends files over TCP with per-chunk integrity checks,
+all accessible through a cross-platform desktop UI built with Avalonia.
 
 ## Features
 
@@ -30,9 +30,6 @@ dotnet run --project src/P2PFileTransfer.Desktop
 
 Run the app on two machines on the same network, start discovery, and send files
 between peers.
-
-> [!TIP]
-> You can drag files onto the Transfers panel to send them to the selected peer.
 
 ## Default Download Location
 
@@ -78,12 +75,17 @@ first launch, a signing keypair is generated and saved alongside the certificate
 
 Each discovery message includes:
 
-- Peer identity, display name, port, and certificate fingerprint
+- Peer ID, display name, IP address, and TCP port
+- Certificate fingerprint
 - The sender's ECDSA public key
-- A signature over the above fields
+- A signature over PeerId + DisplayName + TcpPort + CertificateFingerprint
 
 Receivers verify the signature before trusting the announcement. Messages with
 invalid signatures are discarded, preventing peer impersonation on the network.
+
+Trusted discovery keys follow a trust-on-first-use (TOFU) model for the current
+session only. Other peers' ECDSA public keys are cached in memory and are not persisted across
+restarts by default.
 
 ## Project Layout
 
