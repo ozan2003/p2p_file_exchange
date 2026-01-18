@@ -26,7 +26,7 @@ public sealed class PeerInfo
     /// <summary>
     /// The TCP port used for file transfers.
     /// </summary>
-    public int TcpPort { get; set; }
+    public ushort TcpPort { get; set; }
 
     /// <summary>
     /// The last time the peer was seen.

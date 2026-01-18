@@ -42,7 +42,7 @@ public interface IFileTransferService : IAsyncDisposable
     /// <summary>
     /// The TCP listener port for inbound file transfers.
     /// </summary>
-    int ListenerPort { get; }
+    ushort ListenerPort { get; }
 
     /// <summary>
     /// Starts the TCP listener for inbound transfers with TLS support.
@@ -56,7 +56,7 @@ public interface IFileTransferService : IAsyncDisposable
     /// </param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartListenerAsync(
-        int port,
+        ushort port,
         string downloadDirectory,
         X509Certificate2 certificate,
         Func<IPAddress, string?> fingerprintLookup,

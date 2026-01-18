@@ -12,7 +12,7 @@ public sealed class PeerItemViewModel : ReactiveObject
 {
     private string m_displayName;
     private IPAddress m_ipAddress;
-    private int m_tcpPort;
+    private ushort m_tcpPort;
     private DateTimeOffset m_lastSeen;
 
     /// <summary>
@@ -58,7 +58,7 @@ public sealed class PeerItemViewModel : ReactiveObject
     /// <summary>
     /// The TCP port.
     /// </summary>
-    public int TcpPort
+    public ushort TcpPort
     {
         get => this.m_tcpPort;
         set

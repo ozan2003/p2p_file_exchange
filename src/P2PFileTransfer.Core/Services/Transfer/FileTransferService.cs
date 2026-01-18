@@ -68,11 +68,11 @@ public sealed class FileTransferService : IFileTransferService
     public event EventHandler<TransferFailedEventArgs>? TransferFailed;
 
     /// <inheritdoc />
-    public int ListenerPort { get; private set; }
+    public ushort ListenerPort { get; private set; }
 
     /// <inheritdoc />
     public async Task StartListenerAsync(
-        int port,
+        ushort port,
         string downloadDirectory,
         X509Certificate2 certificate,
         Func<IPAddress, string?> fingerprintLookup,
@@ -106,7 +106,7 @@ public sealed class FileTransferService : IFileTransferService
     /// </param>
     /// <param name="cancellationToken">A cancellation token.</param>
     public async Task StartListenerAsync(
-        int port,
+        ushort port,
         string downloadDirectory,
         X509Certificate2 certificate,
         Func<IPAddress, string?> fingerprintLookup,
@@ -152,9 +152,8 @@ public sealed class FileTransferService : IFileTransferService
             );
             this.m_listener.Start();
 
-            this.ListenerPort = (
-                (IPEndPoint)this.m_listener.LocalEndpoint
-            ).Port;
+            this.ListenerPort = (ushort)
+                ((IPEndPoint)this.m_listener.LocalEndpoint).Port;
 
             this.m_listenerCts =
                 CancellationTokenSource.CreateLinkedTokenSource(

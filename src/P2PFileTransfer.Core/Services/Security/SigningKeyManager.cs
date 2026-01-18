@@ -231,14 +231,14 @@ public sealed class SigningKeyManager
     public static byte[] CreateAnnouncementSigningData(
         Guid peerId,
         string displayName,
-        int tcpPort,
+        ushort tcpPort,
         string certificateFingerprint
     )
     {
         string concatenated = string.Concat(
             peerId.ToString("D"),
             displayName ?? string.Empty,
-            tcpPort.ToString(),
+            tcpPort,
             certificateFingerprint ?? string.Empty
         );
 

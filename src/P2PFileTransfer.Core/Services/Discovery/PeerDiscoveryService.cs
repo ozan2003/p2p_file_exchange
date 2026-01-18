@@ -44,7 +44,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     private Task? m_cleanupTask;
     private string m_displayName = string.Empty;
     private string m_certificateFingerprint = string.Empty;
-    private int m_tcpPort;
+    private ushort m_tcpPort;
     private ECDsa? m_signingKey;
     private string m_localPublicKey = string.Empty;
 
@@ -83,18 +83,18 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     public bool IsRunning { get; private set; }
 
     /// <inheritdoc />
-    public int BroadcastPort => this.m_options.BroadcastPort;
+    public ushort BroadcastPort => this.m_options.BroadcastPort;
 
     /// <inheritdoc />
     public async Task StartAsync(
-        int tcpPort,
+        ushort tcpPort,
         string displayName,
         string certificateFingerprint,
         ECDsa signingKey,
         CancellationToken cancellationToken
     )
     {
-        if (tcpPort <= 0)
+        if (tcpPort == 0)
         {
             throw new ArgumentOutOfRangeException(nameof(tcpPort));
         }
@@ -445,7 +445,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     continue;
                 }
 
-                if (announcement.TcpPort <= 0)
+                if (announcement.TcpPort == 0)
                 {
                     continue;
                 }
@@ -685,7 +685,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         // This should be a string because `IPAddress` isn't serializable.
         public string IPAddress { get; set; } = string.Empty;
 
-        public int TcpPort { get; set; }
+        public ushort TcpPort { get; set; }
 
         public string CertificateFingerprint { get; set; } = string.Empty;
 

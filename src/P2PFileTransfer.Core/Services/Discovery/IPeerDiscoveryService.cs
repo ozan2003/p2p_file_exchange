@@ -41,7 +41,7 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// <summary>
     /// The UDP port used for discovery broadcasts.
     /// </summary>
-    int BroadcastPort { get; }
+    ushort BroadcastPort { get; }
 
     /// <summary>
     /// Starts discovery with the provided TCP listener port, display name, certificate fingerprint, and signing key.
@@ -52,7 +52,7 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// <param name="signingKey">The ECDSA P-256 keypair for signing discovery broadcasts.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
-        int tcpPort,
+        ushort tcpPort,
         string displayName,
         string certificateFingerprint,
         ECDsa signingKey,

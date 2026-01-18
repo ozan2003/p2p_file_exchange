@@ -11,7 +11,7 @@ public sealed class PeerDiscoveryOptions
     /// <summary>
     /// The default broadcast port.
     /// </summary>
-    public const int DefaultBroadcastPort = 37020;
+    public const ushort DefaultBroadcastPort = 37020;
 
     /// <summary>
     /// The default broadcast interval.
@@ -35,7 +35,7 @@ public sealed class PeerDiscoveryOptions
     /// <summary>
     /// The UDP broadcast port.
     /// </summary>
-    public int BroadcastPort { get; set; } = DefaultBroadcastPort;
+    public ushort BroadcastPort { get; set; } = DefaultBroadcastPort;
 
     /// <summary>
     /// The UDP broadcast address.
