@@ -1,8 +1,10 @@
 using System;
-using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Reactive;
+using System.Threading.Tasks;
+using Avalonia.Controls;
+using Avalonia.Platform.Storage;
 using P2PFileTransfer.Core.Services.Transfer;
 using P2PFileTransfer.Desktop.Services;
 using P2PFileTransfer.Desktop.Settings;
@@ -19,18 +21,20 @@ public sealed class SettingsViewModel : ReactiveObject
     private readonly AppSettings m_settings;
     private readonly SettingsStore m_settingsStore;
     private readonly IFileTransferService m_fileTransferService;
-    private string m_broadcastPortText = string.Empty;
+    private readonly IWindowProvider m_windowProvider;
+
+    private decimal m_broadcastPort;
     private string m_broadcastAddressText = string.Empty;
-    private string m_broadcastIntervalSecondsText = string.Empty;
-    private string m_peerTimeoutSecondsText = string.Empty;
-    private string m_cleanupIntervalSecondsText = string.Empty;
-    private string m_chunkSizeKiBText = string.Empty;
-    private string m_bufferSizeKiBText = string.Empty;
-    private string m_tlsHandshakeTimeoutSecondsText = string.Empty;
-    private string m_transferRequestTimeoutSecondsText = string.Empty;
+    private decimal m_broadcastIntervalSeconds;
+    private decimal m_peerTimeoutSeconds;
+    private decimal m_cleanupIntervalSeconds;
+    private decimal m_chunkSizeKiB;
+    private decimal m_bufferSizeKiB;
+    private decimal m_tlsHandshakeTimeoutSeconds;
+    private decimal m_transferRequestTimeoutSeconds;
     private string m_downloadDirectory = string.Empty;
     private string m_certificatePath = string.Empty;
-    private string m_certificateValidityYearsText = string.Empty;
+    private decimal m_certificateValidityYears;
     private string m_signingKeyPath = string.Empty;
     private string m_statusMessage = string.Empty;
 
@@ -40,21 +44,33 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <param name="settings">The current application settings.</param>
     /// <param name="settingsStore">The settings store.</param>
     /// <param name="fileTransferService">The file transfer service.</param>
+    /// <param name="windowProvider">The window provider.</param>
     public SettingsViewModel(
         AppSettings settings,
         SettingsStore settingsStore,
-        IFileTransferService fileTransferService
+        IFileTransferService fileTransferService,
+        IWindowProvider windowProvider
     )
     {
         this.m_settings = settings;
         this.m_settingsStore = settingsStore;
         this.m_fileTransferService = fileTransferService;
+        this.m_windowProvider = windowProvider;
 
         this.LoadFromSettings();
 
         this.SaveCommand = ReactiveCommand.Create(this.Save);
         this.CancelCommand = ReactiveCommand.Create(() =>
             this.RequestClose?.Invoke(this, EventArgs.Empty)
+        );
+        this.BrowseDownloadDirectoryCommand = ReactiveCommand.CreateFromTask(
+            this.BrowseDownloadDirectoryAsync
+        );
+        this.BrowseCertificatePathCommand = ReactiveCommand.CreateFromTask(
+            this.BrowseCertificatePathAsync
+        );
+        this.BrowseSigningKeyPathCommand = ReactiveCommand.CreateFromTask(
+            this.BrowseSigningKeyPathAsync
         );
     }
 
@@ -64,12 +80,12 @@ public sealed class SettingsViewModel : ReactiveObject
     public event EventHandler? RequestClose;
 
     /// <summary>
-    /// The broadcast port.
+    /// The broadcast port (1-65535).
     /// </summary>
-    public string BroadcastPortText
+    public decimal BroadcastPort
     {
-        get => this.m_broadcastPortText;
-        set => this.RaiseAndSetIfChanged(ref this.m_broadcastPortText, value);
+        get => this.m_broadcastPort;
+        set => this.RaiseAndSetIfChanged(ref this.m_broadcastPort, value);
     }
 
     /// <summary>
@@ -85,12 +101,12 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <summary>
     /// The broadcast interval in seconds.
     /// </summary>
-    public string BroadcastIntervalSecondsText
+    public decimal BroadcastIntervalSeconds
     {
-        get => this.m_broadcastIntervalSecondsText;
+        get => this.m_broadcastIntervalSeconds;
         set =>
             this.RaiseAndSetIfChanged(
-                ref this.m_broadcastIntervalSecondsText,
+                ref this.m_broadcastIntervalSeconds,
                 value
             );
     }
@@ -98,53 +114,49 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <summary>
     /// The peer timeout in seconds.
     /// </summary>
-    public string PeerTimeoutSecondsText
+    public decimal PeerTimeoutSeconds
     {
-        get => this.m_peerTimeoutSecondsText;
-        set =>
-            this.RaiseAndSetIfChanged(ref this.m_peerTimeoutSecondsText, value);
+        get => this.m_peerTimeoutSeconds;
+        set => this.RaiseAndSetIfChanged(ref this.m_peerTimeoutSeconds, value);
     }
 
     /// <summary>
     /// The cleanup interval in seconds.
     /// </summary>
-    public string CleanupIntervalSecondsText
+    public decimal CleanupIntervalSeconds
     {
-        get => this.m_cleanupIntervalSecondsText;
+        get => this.m_cleanupIntervalSeconds;
         set =>
-            this.RaiseAndSetIfChanged(
-                ref this.m_cleanupIntervalSecondsText,
-                value
-            );
+            this.RaiseAndSetIfChanged(ref this.m_cleanupIntervalSeconds, value);
     }
 
     /// <summary>
     /// The chunk size in KiB.
     /// </summary>
-    public string ChunkSizeKiBText
+    public decimal ChunkSizeKiB
     {
-        get => this.m_chunkSizeKiBText;
-        set => this.RaiseAndSetIfChanged(ref this.m_chunkSizeKiBText, value);
+        get => this.m_chunkSizeKiB;
+        set => this.RaiseAndSetIfChanged(ref this.m_chunkSizeKiB, value);
     }
 
     /// <summary>
     /// The buffer size in KiB.
     /// </summary>
-    public string BufferSizeKiBText
+    public decimal BufferSizeKiB
     {
-        get => this.m_bufferSizeKiBText;
-        set => this.RaiseAndSetIfChanged(ref this.m_bufferSizeKiBText, value);
+        get => this.m_bufferSizeKiB;
+        set => this.RaiseAndSetIfChanged(ref this.m_bufferSizeKiB, value);
     }
 
     /// <summary>
     /// The TLS handshake timeout in seconds.
     /// </summary>
-    public string TlsHandshakeTimeoutSecondsText
+    public decimal TlsHandshakeTimeoutSeconds
     {
-        get => this.m_tlsHandshakeTimeoutSecondsText;
+        get => this.m_tlsHandshakeTimeoutSeconds;
         set =>
             this.RaiseAndSetIfChanged(
-                ref this.m_tlsHandshakeTimeoutSecondsText,
+                ref this.m_tlsHandshakeTimeoutSeconds,
                 value
             );
     }
@@ -152,12 +164,12 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <summary>
     /// The transfer request timeout in seconds.
     /// </summary>
-    public string TransferRequestTimeoutSecondsText
+    public decimal TransferRequestTimeoutSeconds
     {
-        get => this.m_transferRequestTimeoutSecondsText;
+        get => this.m_transferRequestTimeoutSeconds;
         set =>
             this.RaiseAndSetIfChanged(
-                ref this.m_transferRequestTimeoutSecondsText,
+                ref this.m_transferRequestTimeoutSeconds,
                 value
             );
     }
@@ -183,12 +195,12 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <summary>
     /// The certificate validity in years.
     /// </summary>
-    public string CertificateValidityYearsText
+    public decimal CertificateValidityYears
     {
-        get => this.m_certificateValidityYearsText;
+        get => this.m_certificateValidityYears;
         set =>
             this.RaiseAndSetIfChanged(
-                ref this.m_certificateValidityYearsText,
+                ref this.m_certificateValidityYears,
                 value
             );
     }
@@ -222,69 +234,71 @@ public sealed class SettingsViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> CancelCommand { get; }
 
     /// <summary>
+    /// Command to browse for the download directory.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> BrowseDownloadDirectoryCommand { get; }
+
+    /// <summary>
+    /// Command to browse for the certificate file.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> BrowseCertificatePathCommand { get; }
+
+    /// <summary>
+    /// Command to browse for the signing key file.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> BrowseSigningKeyPathCommand { get; }
+
+    /// <summary>
     /// Loads persisted settings into editable fields.
     /// </summary>
     private void LoadFromSettings()
     {
         this.m_settings.Normalize();
 
-        this.BroadcastPortText =
-            this.m_settings.Discovery.BroadcastPort.ToString(
-                CultureInfo.InvariantCulture
-            );
+        this.BroadcastPort = this.m_settings.Discovery.BroadcastPort;
         this.BroadcastAddressText =
             this.m_settings.Discovery.BroadcastAddress.ToString();
-        this.BroadcastIntervalSecondsText = Math.Max(
-                1,
-                (int)this.m_settings.Discovery.BroadcastInterval.TotalSeconds
-            )
-            .ToString(CultureInfo.InvariantCulture);
-        this.PeerTimeoutSecondsText = Math.Max(
-                1,
-                (int)this.m_settings.Discovery.PeerTimeout.TotalSeconds
-            )
-            .ToString(CultureInfo.InvariantCulture);
-        this.CleanupIntervalSecondsText = Math.Max(
-                1,
-                (int)this.m_settings.Discovery.CleanupInterval.TotalSeconds
-            )
-            .ToString(CultureInfo.InvariantCulture);
+        this.BroadcastIntervalSeconds = Math.Max(
+            1,
+            (int)this.m_settings.Discovery.BroadcastInterval.TotalSeconds
+        );
+        this.PeerTimeoutSeconds = Math.Max(
+            1,
+            (int)this.m_settings.Discovery.PeerTimeout.TotalSeconds
+        );
+        this.CleanupIntervalSeconds = Math.Max(
+            1,
+            (int)this.m_settings.Discovery.CleanupInterval.TotalSeconds
+        );
 
-        this.ChunkSizeKiBText = Math.Max(
-                1,
-                (int)
-                    Math.Ceiling(
-                        this.m_settings.Transfer.ChunkSize / (double)BytesPerKiB
-                    )
-            )
-            .ToString(CultureInfo.InvariantCulture);
-        this.BufferSizeKiBText = Math.Max(
-                1,
-                (int)
-                    Math.Ceiling(
-                        this.m_settings.Transfer.BufferSize
-                            / (double)BytesPerKiB
-                    )
-            )
-            .ToString(CultureInfo.InvariantCulture);
-        this.TlsHandshakeTimeoutSecondsText = Math.Max(
-                1,
-                (int)this.m_settings.Transfer.TlsHandshakeTimeout.TotalSeconds
-            )
-            .ToString(CultureInfo.InvariantCulture);
-        this.TransferRequestTimeoutSecondsText = Math.Max(
-                1,
-                (int)
-                    this.m_settings.Transfer.TransferRequestTimeout.TotalSeconds
-            )
-            .ToString(CultureInfo.InvariantCulture);
+        this.ChunkSizeKiB = Math.Max(
+            1,
+            (int)
+                Math.Ceiling(
+                    this.m_settings.Transfer.ChunkSize / (double)BytesPerKiB
+                )
+        );
+        this.BufferSizeKiB = Math.Max(
+            1,
+            (int)
+                Math.Ceiling(
+                    this.m_settings.Transfer.BufferSize / (double)BytesPerKiB
+                )
+        );
+        this.TlsHandshakeTimeoutSeconds = Math.Max(
+            1,
+            (int)this.m_settings.Transfer.TlsHandshakeTimeout.TotalSeconds
+        );
+        this.TransferRequestTimeoutSeconds = Math.Max(
+            1,
+            (int)this.m_settings.Transfer.TransferRequestTimeout.TotalSeconds
+        );
 
         this.DownloadDirectory = this.m_settings.DownloadDirectory;
         this.CertificatePath = this.m_settings.Security.CertificatePath;
-        this.CertificateValidityYearsText =
-            this.m_settings.Security.CertificateValidityYears.ToString(
-                CultureInfo.InvariantCulture
-            );
+        this.CertificateValidityYears = this.m_settings
+            .Security
+            .CertificateValidityYears;
         this.SigningKeyPath = this.m_settings.Security.SigningKeyPath;
     }
 
@@ -296,17 +310,6 @@ public sealed class SettingsViewModel : ReactiveObject
         this.StatusMessage = string.Empty;
 
         if (
-            !TryParsePort(
-                this.BroadcastPortText,
-                "Broadcast port",
-                out ushort broadcastPort
-            )
-        )
-        {
-            return;
-        }
-
-        if (
             string.IsNullOrWhiteSpace(this.BroadcastAddressText)
             || !IPAddress.TryParse(
                 this.BroadcastAddressText.Trim(),
@@ -315,52 +318,6 @@ public sealed class SettingsViewModel : ReactiveObject
         )
         {
             this.StatusMessage = "Broadcast address must be a valid IP.";
-            return;
-        }
-
-        if (
-            !TryParsePositiveInt(
-                this.BroadcastIntervalSecondsText,
-                "Broadcast interval (seconds)",
-                out int broadcastIntervalSeconds
-            )
-            || !TryParsePositiveInt(
-                this.PeerTimeoutSecondsText,
-                "Peer timeout (seconds)",
-                out int peerTimeoutSeconds
-            )
-            || !TryParsePositiveInt(
-                this.CleanupIntervalSecondsText,
-                "Cleanup interval (seconds)",
-                out int cleanupIntervalSeconds
-            )
-            || !TryParsePositiveInt(
-                this.ChunkSizeKiBText,
-                "Chunk size (KiB)",
-                out int chunkSizeKiB
-            )
-            || !TryParsePositiveInt(
-                this.BufferSizeKiBText,
-                "Buffer size (KiB)",
-                out int bufferSizeKiB
-            )
-            || !TryParsePositiveInt(
-                this.TlsHandshakeTimeoutSecondsText,
-                "TLS handshake timeout (seconds)",
-                out int tlsHandshakeSeconds
-            )
-            || !TryParsePositiveInt(
-                this.TransferRequestTimeoutSecondsText,
-                "Transfer request timeout (seconds)",
-                out int transferRequestSeconds
-            )
-            || !TryParsePositiveInt(
-                this.CertificateValidityYearsText,
-                "Certificate validity (years)",
-                out int validityYears
-            )
-        )
-        {
             return;
         }
 
@@ -385,6 +342,9 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
+        int chunkSizeKiB = (int)this.ChunkSizeKiB;
+        int bufferSizeKiB = (int)this.BufferSizeKiB;
+
         if (chunkSizeKiB > int.MaxValue / BytesPerKiB)
         {
             this.StatusMessage = "Chunk size is too large.";
@@ -397,30 +357,31 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
-        this.m_settings.Discovery.BroadcastPort = broadcastPort;
+        this.m_settings.Discovery.BroadcastPort = (ushort)this.BroadcastPort;
         this.m_settings.Discovery.BroadcastAddress = broadcastAddress;
         this.m_settings.Discovery.BroadcastInterval = TimeSpan.FromSeconds(
-            broadcastIntervalSeconds
+            (int)this.BroadcastIntervalSeconds
         );
         this.m_settings.Discovery.PeerTimeout = TimeSpan.FromSeconds(
-            peerTimeoutSeconds
+            (int)this.PeerTimeoutSeconds
         );
         this.m_settings.Discovery.CleanupInterval = TimeSpan.FromSeconds(
-            cleanupIntervalSeconds
+            (int)this.CleanupIntervalSeconds
         );
 
         this.m_settings.Transfer.ChunkSize = chunkSizeKiB * BytesPerKiB;
         this.m_settings.Transfer.BufferSize = bufferSizeKiB * BytesPerKiB;
         this.m_settings.Transfer.TlsHandshakeTimeout = TimeSpan.FromSeconds(
-            tlsHandshakeSeconds
+            (int)this.TlsHandshakeTimeoutSeconds
         );
         this.m_settings.Transfer.TransferRequestTimeout = TimeSpan.FromSeconds(
-            transferRequestSeconds
+            (int)this.TransferRequestTimeoutSeconds
         );
 
         this.m_settings.DownloadDirectory = downloadDirectory;
         this.m_settings.Security.CertificatePath = certificatePath;
-        this.m_settings.Security.CertificateValidityYears = validityYears;
+        this.m_settings.Security.CertificateValidityYears = (int)
+            this.CertificateValidityYears;
         this.m_settings.Security.SigningKeyPath = signingKeyPath;
 
         try
@@ -447,55 +408,94 @@ public sealed class SettingsViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Parses a positive integer from user input.
+    /// Opens a folder picker for the download directory.
     /// </summary>
-    private bool TryParsePositiveInt(
-        string? value,
-        string fieldName,
-        out int result
-    )
+    private async Task BrowseDownloadDirectoryAsync()
     {
-        if (
-            !int.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out result
-            )
-            || result <= 0
-        )
+        string? path = await this.PickFolderAsync("Select Download Directory");
+        if (!string.IsNullOrWhiteSpace(path))
         {
-            this.StatusMessage = $"{fieldName} must be a positive number.";
-            return false;
+            this.DownloadDirectory = path;
         }
-
-        return true;
     }
 
     /// <summary>
-    /// Parses a TCP/UDP port from user input.
+    /// Opens a file picker for the certificate path.
     /// </summary>
-    private bool TryParsePort(
-        string? value,
-        string fieldName,
-        out ushort result
-    )
+    private async Task BrowseCertificatePathAsync()
     {
-        if (
-            !ushort.TryParse(
-                value,
-                NumberStyles.Integer,
-                CultureInfo.InvariantCulture,
-                out result
-            )
-            || result == 0
-        )
+        string? path = await this.PickFileAsync(
+            "Select Certificate File",
+            [new FilePickerFileType("PFX Certificate") { Patterns = ["*.pfx"] }]
+        );
+        if (!string.IsNullOrWhiteSpace(path))
         {
-            this.StatusMessage = $"{fieldName} must be between 1 and 65535.";
-            return false;
+            this.CertificatePath = path;
+        }
+    }
+
+    /// <summary>
+    /// Opens a file picker for the signing key path.
+    /// </summary>
+    private async Task BrowseSigningKeyPathAsync()
+    {
+        string? path = await this.PickFileAsync(
+            "Select Signing Key File",
+            [
+                new FilePickerFileType("Key File")
+                {
+                    Patterns = ["*.key", "*.pem"],
+                },
+            ]
+        );
+        if (!string.IsNullOrWhiteSpace(path))
+        {
+            this.SigningKeyPath = path;
+        }
+    }
+
+    /// <summary>
+    /// Opens a folder picker dialog.
+    /// </summary>
+    private async Task<string?> PickFolderAsync(string title)
+    {
+        Window? window = this.m_windowProvider.MainWindow;
+        if (window == null)
+        {
+            return null;
         }
 
-        return true;
+        FolderPickerOpenOptions options = new() { Title = title };
+        System.Collections.Generic.IReadOnlyList<IStorageFolder> folders =
+            await window.StorageProvider.OpenFolderPickerAsync(options);
+
+        return folders.Count > 0 ? folders[0].Path.LocalPath : null;
+    }
+
+    /// <summary>
+    /// Opens a file picker dialog.
+    /// </summary>
+    private async Task<string?> PickFileAsync(
+        string title,
+        FilePickerFileType[] fileTypes
+    )
+    {
+        Window? window = this.m_windowProvider.MainWindow;
+        if (window == null)
+        {
+            return null;
+        }
+
+        FilePickerOpenOptions options = new()
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = fileTypes,
+        };
+        System.Collections.Generic.IReadOnlyList<IStorageFile> files =
+            await window.StorageProvider.OpenFilePickerAsync(options);
+
+        return files.Count > 0 ? files[0].Path.LocalPath : null;
     }
 
     /// <summary>
