@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using P2PFileTransfer.Desktop.ViewModels;
 
 namespace P2PFileTransfer.Desktop.Views;
@@ -31,6 +33,25 @@ public partial class MainWindow : Window
             ? DragDropEffects.Copy
             : DragDropEffects.None;
 #pragma warning restore CS0618
+    }
+
+    /// <summary>
+    /// Clears focus when clicking on empty space (not inside a TextBox).
+    /// </summary>
+    private void OnBackgroundPointerPressed(
+        object? sender,
+        PointerPressedEventArgs e
+    )
+    {
+        if (
+            e.Source is Visual visual
+            && visual.FindAncestorOfType<TextBox>() != null
+        )
+        {
+            return;
+        }
+
+        this.FocusManager?.ClearFocus();
     }
 
     /// <summary>

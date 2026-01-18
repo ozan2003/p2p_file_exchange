@@ -147,7 +147,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
 
             this.RaiseAndSetIfChanged(ref this.m_displayName, sanitized);
             this.RaisePropertyChanged(nameof(this.EffectiveDisplayName));
-            this.m_peerDiscoveryService.UpdateDisplayName(this.EffectiveDisplayName);
+            this.m_peerDiscoveryService.UpdateDisplayName(
+                this.EffectiveDisplayName
+            );
         }
     }
 

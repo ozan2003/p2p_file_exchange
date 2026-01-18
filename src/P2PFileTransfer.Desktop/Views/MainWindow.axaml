@@ -13,7 +13,8 @@
         Icon="/Assets/avalonia-logo.ico"
         Title="P2P File Transfer"
         DragDrop.AllowDrop="True">
-    <DockPanel>
+    <DockPanel Background="Transparent"
+               PointerPressed="OnBackgroundPointerPressed">
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_Settings">
                 <MenuItem Header="_Preferences..."
