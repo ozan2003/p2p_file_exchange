@@ -25,7 +25,7 @@ all accessible through a cross-platform desktop UI built with Avalonia.
 
 ```bash
 dotnet restore
-dotnet run --project src/P2PFileTransfer.Desktop
+dotnet run --project src/P2PFileExchange.Desktop
 ```
 
 Run the app on two machines on the same network, start discovery, and send files
@@ -36,7 +36,7 @@ between peers.
 Inbound files are saved to:
 
 ```text
-~/Downloads/P2PFileTransfer
+~/Downloads/P2PFileExchange
 ```
 
 ## Network Details
@@ -56,8 +56,8 @@ All file transfers use TLS encryption with self-signed certificates. On first
 run, a certificate is generated and saved to:
 
 ```text
-~/.config/P2PFileTransfer/peer.pfx    (Linux)
-%APPDATA%\P2PFileTransfer\peer.pfx    (Windows)
+~/.config/P2PFileExchange/peer.pfx    (Linux)
+%APPDATA%\P2PFileExchange\peer.pfx    (Windows)
 ```
 
 Certificate fingerprints are exchanged during peer discovery and verified during
@@ -69,8 +69,8 @@ Peer discovery broadcasts are authenticated using ECDSA (P-256) signatures. On
 first launch, a signing keypair is generated and saved alongside the certificate:
 
 ```text
-~/.config/P2PFileTransfer/signing.key    (Linux)
-%APPDATA%\P2PFileTransfer\signing.key    (Windows)
+~/.config/P2PFileExchange/signing.key    (Linux)
+%APPDATA%\P2PFileExchange\signing.key    (Windows)
 ```
 
 Each discovery message includes:
@@ -89,5 +89,5 @@ restarts by default.
 
 ## Project Layout
 
-- `src/P2PFileTransfer.Core`: discovery, protocol, and transfer logic
-- `src/P2PFileTransfer.Desktop`: Avalonia UI client
+- `src/P2PFileExchange.Core`: discovery, protocol, and transfer logic
+- `src/P2PFileExchange.Desktop`: Avalonia UI client

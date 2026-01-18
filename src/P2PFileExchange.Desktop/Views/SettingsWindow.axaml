@@ -1,0 +1,245 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:P2PFileExchange.Desktop.ViewModels"
+        x:Class="P2PFileExchange.Desktop.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="720"
+        Height="640"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+    <Window.Styles>
+        <Style Selector="NumericUpDown.warning /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#e74c3c" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+    </Window.Styles>
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,8">
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="0"
+                        Content="Reset to Defaults"
+                        Command="{Binding ResetToDefaultsCommand}" />
+                <TextBlock Grid.Column="1"
+                           Text="{Binding StatusMessage}"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding StatusMessage.Length}" />
+                <Button Grid.Column="2"
+                        Content="Cancel"
+                        MinWidth="80"
+                        IsCancel="True"
+                        Command="{Binding CancelCommand}" />
+                <Button Grid.Column="3"
+                        Content="Save"
+                        MinWidth="80"
+                        Classes="accent"
+                        IsDefault="True"
+                        Command="{Binding SaveCommand}" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12" Spacing="16">
+                <TextBlock Text="Discovery"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Broadcast interval (seconds)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="0"
+                                   Grid.Column="1"
+                                   Value="{Binding BroadcastIntervalSeconds}"
+                                   Width="150"
+                                   HorizontalAlignment="Right"
+                                   Minimum="1"
+                                   Maximum="3600"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Watermark="5"
+                                   Classes.warning="{Binding HasPeerTimeoutWarning}" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Peer timeout (seconds)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="1"
+                                   Grid.Column="1"
+                                   Value="{Binding PeerTimeoutSeconds}"
+                                   Minimum="1"
+                                   Maximum="3600"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Watermark="15"
+                                   Width="150"
+                                   HorizontalAlignment="Right"
+                                   Classes.warning="{Binding HasPeerTimeoutWarning}" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="Cleanup interval (seconds)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="2"
+                                   Grid.Column="1"
+                                   Value="{Binding CleanupIntervalSeconds}"
+                                   Minimum="1"
+                                   Maximum="3600"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Watermark="5"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
+                </Grid>
+                <TextBlock Text="Broadcast interval is less than peer timeout; peers may dissapear often before they update their presence.
+                "
+                           Foreground="#e74c3c"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasPeerTimeoutWarning}"
+                           Margin="0,-8,0,0" />
+
+                <TextBlock Text="Transfer"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Chunk size (KiB)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="0"
+                                   Grid.Column="1"
+                                   Value="{Binding ChunkSizeKiB}"
+                                   Minimum="1"
+                                   Maximum="65536"
+                                   Increment="64"
+                                   FormatString="0"
+                                   Watermark="256"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Buffer size (KiB)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="1"
+                                   Grid.Column="1"
+                                   Value="{Binding BufferSizeKiB}"
+                                   Minimum="1"
+                                   Maximum="65536"
+                                   Increment="16"
+                                   FormatString="0"
+                                   Watermark="80"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="TLS handshake timeout (seconds)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="2"
+                                   Grid.Column="1"
+                                   Value="{Binding TlsHandshakeTimeoutSeconds}"
+                                   Minimum="1"
+                                   Maximum="300"
+                                   Increment="5"
+                                   FormatString="0"
+                                   Watermark="10"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
+
+                    <TextBlock Grid.Row="3"
+                               Text="Transfer request timeout (seconds)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="3"
+                                   Grid.Column="1"
+                                   Value="{Binding TransferRequestTimeoutSeconds}"
+                                   Minimum="1"
+                                   Maximum="600"
+                                   Increment="30"
+                                   FormatString="0"
+                                   Watermark="120"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
+                </Grid>
+
+                <TextBlock Text="Download"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Download directory"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding DownloadDirectory, Mode=TwoWay}" />
+                    <Button Grid.Row="0"
+                            Grid.Column="2"
+                            Content="Browse..."
+                            Command="{Binding BrowseDownloadDirectoryCommand}"
+                            MinWidth="80" />
+                </Grid>
+
+                <TextBlock Text="Security"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Certificate path"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding CertificatePath, Mode=TwoWay}" />
+                    <Button Grid.Row="0"
+                            Grid.Column="2"
+                            Content="Browse..."
+                            Command="{Binding BrowseCertificatePathCommand}"
+                            MinWidth="80" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Certificate validity (years)"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <NumericUpDown Grid.Row="1"
+                                   Grid.Column="1"
+                                   Value="{Binding CertificateValidityYears}"
+                                   Minimum="1"
+                                   Maximum="100"
+                                   Increment="1"
+                                   FormatString="0"
+                                   Watermark="10"
+                                   Width="150"
+                                   HorizontalAlignment="Left" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="Signing key path"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding SigningKeyPath, Mode=TwoWay}" />
+                    <Button Grid.Row="2"
+                            Grid.Column="2"
+                            Content="Browse..."
+                            Command="{Binding BrowseSigningKeyPathCommand}"
+                            MinWidth="80" />
+                </Grid>
+
+                <TextBlock Text="Note: Discovery and security changes apply after restarting discovery or the app."
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>
