@@ -80,10 +80,7 @@ public sealed class CertificateManager
         string password
     )
     {
-        if (certificate == null)
-        {
-            throw new ArgumentNullException(nameof(certificate));
-        }
+        ArgumentNullException.ThrowIfNull(certificate, nameof(certificate));
 
         EnsureFilePath(filePath);
 
@@ -128,10 +125,7 @@ public sealed class CertificateManager
     /// <param name="certificate">The certificate to hash.</param>
     public string GetCertificateFingerprint(X509Certificate2 certificate)
     {
-        if (certificate == null)
-        {
-            throw new ArgumentNullException(nameof(certificate));
-        }
+        ArgumentNullException.ThrowIfNull(certificate, nameof(certificate));
 
         byte[] hashBytes = SHA256.HashData(certificate.RawData);
         return Convert.ToHexString(hashBytes);
