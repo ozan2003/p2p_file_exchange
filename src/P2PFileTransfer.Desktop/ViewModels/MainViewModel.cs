@@ -70,7 +70,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_signingKeyManager = new SigningKeyManager();
         this.m_settings = settings;
 
-        this.m_displayName = GetDefaultDisplayName();
+        this.m_displayName = string.Empty;
 
         this.Peers = [];
         this.Transfers = [];
@@ -132,7 +132,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     }
 
     /// <summary>
-    /// The display name shown to other peers.
+    /// The display name entered by the user (may be empty).
     /// </summary>
     public string DisplayName
     {
@@ -146,9 +146,23 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             }
 
             this.RaiseAndSetIfChanged(ref this.m_displayName, sanitized);
-            this.m_peerDiscoveryService.UpdateDisplayName(sanitized);
+            this.RaisePropertyChanged(nameof(this.EffectiveDisplayName));
+            this.m_peerDiscoveryService.UpdateDisplayName(this.EffectiveDisplayName);
         }
     }
+
+    /// <summary>
+    /// The effective display name (user's input or default if empty).
+    /// </summary>
+    public string EffectiveDisplayName =>
+        string.IsNullOrWhiteSpace(this.m_displayName)
+            ? DefaultDisplayName
+            : this.m_displayName;
+
+    /// <summary>
+    /// The default display name used as watermark and fallback.
+    /// </summary>
+    public static string DefaultDisplayName => GetDefaultDisplayName();
 
     /// <summary>
     /// A value indicating whether discovery is running.
@@ -298,9 +312,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
 
     private static string SanitizeDisplayName(string value)
     {
-        if (string.IsNullOrWhiteSpace(value))
+        if (string.IsNullOrEmpty(value))
         {
-            return GetDefaultDisplayName();
+            return string.Empty;
         }
 
         string trimmed = value.Trim();
@@ -334,7 +348,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             await this
                 .m_peerDiscoveryService.StartAsync(
                     this.m_fileTransferService.ListenerPort,
-                    this.DisplayName,
+                    this.EffectiveDisplayName,
                     this.m_localFingerprint,
                     this.m_signingKey,
                     CancellationToken.None
