@@ -14,6 +14,11 @@ all accessible through a cross-platform desktop UI built with Avalonia.
 - Transfer progress, speed, and ETA tracking
 - Automatic download folder and collision-safe file naming
 
+## Screenshots
+
+![Main window](assets/p2p_mainscreen.png)
+![Receiving transfer](assets/p2p_receiving.png)
+
 > [!NOTE]
 > Peer discovery uses UDP broadcast, so devices must be on the same LAN.
 
