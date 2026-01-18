@@ -11,9 +11,10 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
+using P2PFileTransfer.Core.Models.TransferEvents;
 using P2PFileTransfer.Core.Utilities;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Transfer;
 
 /// <summary>
 /// Provides TCP-based file transfer functionality.

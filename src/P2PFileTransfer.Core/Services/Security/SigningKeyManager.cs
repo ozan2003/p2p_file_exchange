@@ -3,7 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Security;
 
 /// <summary>
 /// Manages ECDSA P-256 keypair generation, persistence, and cryptographic operations

@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Transfer;
 
 /// <summary>
 /// Implements the wire protocol for metadata and chunk payloads.

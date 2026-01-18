@@ -1,6 +1,6 @@
 using System;
 
-namespace P2PFileTransfer.Core.Models;
+namespace P2PFileTransfer.Core.Models.TransferEvents;
 
 /// <summary>
 /// Provides data for the transfer request received event.

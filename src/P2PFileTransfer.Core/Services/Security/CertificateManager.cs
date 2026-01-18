@@ -3,7 +3,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Security;
 
 /// <summary>
 /// Manages X509 certificate generation, persistence, and fingerprinting.

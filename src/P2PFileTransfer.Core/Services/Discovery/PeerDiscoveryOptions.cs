@@ -1,7 +1,7 @@
 using System;
 using System.Net;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Discovery;
 
 /// <summary>
 /// Provides configuration for peer discovery.

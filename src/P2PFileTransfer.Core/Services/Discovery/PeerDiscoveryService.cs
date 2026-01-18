@@ -9,9 +9,10 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
+using P2PFileTransfer.Core.Services.Security;
 using P2PFileTransfer.Core.Utilities;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Discovery;
 
 /// <summary>
 /// Handles UDP broadcast discovery of peers on the local network.

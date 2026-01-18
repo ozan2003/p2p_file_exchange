@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
 
-namespace P2PFileTransfer.Core.Services;
+namespace P2PFileTransfer.Core.Services.Discovery;
 
 /// <summary>
 /// Describes peer discovery operations over UDP broadcast on the same LAN.
