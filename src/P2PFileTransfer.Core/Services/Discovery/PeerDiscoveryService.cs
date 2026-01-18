@@ -227,23 +227,15 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             return null;
         }
 
-        foreach (PeerInfo peer in this.m_peers.Values)
-        {
-            if (
+        return this
+            .m_peers.Values.FirstOrDefault(peer =>
                 string.Equals(
                     peer.IPAddress,
                     ipAddress,
                     StringComparison.OrdinalIgnoreCase
-                )
+                ) && !string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
             )
-            {
-                return string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
-                    ? null
-                    : peer.CertificateFingerprint;
-            }
-        }
-
-        return null;
+            ?.CertificateFingerprint;
     }
 
     /// <inheritdoc />
@@ -254,23 +246,15 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             return null;
         }
 
-        foreach (PeerInfo peer in this.m_peers.Values)
-        {
-            if (
+        return this
+            .m_peers.Values.FirstOrDefault(peer =>
                 string.Equals(
                     peer.IPAddress,
                     ipAddress,
                     StringComparison.OrdinalIgnoreCase
-                )
+                ) && !string.IsNullOrWhiteSpace(peer.DisplayName)
             )
-            {
-                return string.IsNullOrWhiteSpace(peer.DisplayName)
-                    ? null
-                    : peer.DisplayName;
-            }
-        }
-
-        return null;
+            ?.DisplayName;
     }
 
     /// <inheritdoc />
