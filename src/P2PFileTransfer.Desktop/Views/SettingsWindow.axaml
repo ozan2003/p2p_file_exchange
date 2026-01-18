@@ -44,31 +44,11 @@
                 <TextBlock Text="Discovery"
                            FontWeight="SemiBold"
                            FontSize="14" />
-                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
-                               Text="Broadcast port"
-                               VerticalAlignment="Center" />
-                    <NumericUpDown Grid.Row="0"
-                                   Grid.Column="1"
-                                   Value="{Binding BroadcastPort}"
-                                   Minimum="1"
-                                   Maximum="65535"
-                                   Increment="1"
-                                   FormatString="0"
-                                   Watermark="37020" />
-
-                    <TextBlock Grid.Row="1"
-                               Text="Broadcast address"
-                               VerticalAlignment="Center" />
-                    <TextBox Grid.Row="1"
-                             Grid.Column="1"
-                             Text="{Binding BroadcastAddressText, Mode=TwoWay}"
-                             Watermark="255.255.255.255" />
-
-                    <TextBlock Grid.Row="2"
                                Text="Broadcast interval (seconds)"
                                VerticalAlignment="Center" />
-                    <NumericUpDown Grid.Row="2"
+                    <NumericUpDown Grid.Row="0"
                                    Grid.Column="1"
                                    Value="{Binding BroadcastIntervalSeconds}"
                                    Minimum="1"
@@ -77,10 +57,10 @@
                                    FormatString="0"
                                    Watermark="5" />
 
-                    <TextBlock Grid.Row="3"
+                    <TextBlock Grid.Row="1"
                                Text="Peer timeout (seconds)"
                                VerticalAlignment="Center" />
-                    <NumericUpDown Grid.Row="3"
+                    <NumericUpDown Grid.Row="1"
                                    Grid.Column="1"
                                    Value="{Binding PeerTimeoutSeconds}"
                                    Minimum="1"
@@ -89,10 +69,10 @@
                                    FormatString="0"
                                    Watermark="15" />
 
-                    <TextBlock Grid.Row="4"
+                    <TextBlock Grid.Row="2"
                                Text="Cleanup interval (seconds)"
                                VerticalAlignment="Center" />
-                    <NumericUpDown Grid.Row="4"
+                    <NumericUpDown Grid.Row="2"
                                    Grid.Column="1"
                                    Value="{Binding CleanupIntervalSeconds}"
                                    Minimum="1"

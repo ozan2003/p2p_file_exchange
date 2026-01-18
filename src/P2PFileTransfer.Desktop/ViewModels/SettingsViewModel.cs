@@ -1,6 +1,5 @@
 using System;
 using System.IO;
-using System.Net;
 using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -26,8 +25,6 @@ public sealed class SettingsViewModel : ReactiveObject
     private readonly IFileTransferService m_fileTransferService;
     private readonly IWindowProvider m_windowProvider;
 
-    private decimal m_broadcastPort;
-    private string m_broadcastAddressText = string.Empty;
     private decimal m_broadcastIntervalSeconds;
     private decimal m_peerTimeoutSeconds;
     private decimal m_cleanupIntervalSeconds;
@@ -84,25 +81,6 @@ public sealed class SettingsViewModel : ReactiveObject
     /// Raised when the window should close.
     /// </summary>
     public event EventHandler? RequestClose;
-
-    /// <summary>
-    /// The broadcast port (1-65535).
-    /// </summary>
-    public decimal BroadcastPort
-    {
-        get => this.m_broadcastPort;
-        set => this.RaiseAndSetIfChanged(ref this.m_broadcastPort, value);
-    }
-
-    /// <summary>
-    /// The broadcast address.
-    /// </summary>
-    public string BroadcastAddressText
-    {
-        get => this.m_broadcastAddressText;
-        set =>
-            this.RaiseAndSetIfChanged(ref this.m_broadcastAddressText, value);
-    }
 
     /// <summary>
     /// The broadcast interval in seconds.
@@ -266,9 +244,6 @@ public sealed class SettingsViewModel : ReactiveObject
     {
         this.m_settings.Normalize();
 
-        this.BroadcastPort = this.m_settings.Discovery.BroadcastPort;
-        this.BroadcastAddressText =
-            this.m_settings.Discovery.BroadcastAddress.ToString();
         this.BroadcastIntervalSeconds = Math.Max(
             1,
             (int)this.m_settings.Discovery.BroadcastInterval.TotalSeconds
@@ -321,18 +296,6 @@ public sealed class SettingsViewModel : ReactiveObject
         this.StatusMessage = string.Empty;
 
         if (
-            string.IsNullOrWhiteSpace(this.BroadcastAddressText)
-            || !IPAddress.TryParse(
-                this.BroadcastAddressText.Trim(),
-                out IPAddress? broadcastAddress
-            )
-        )
-        {
-            this.StatusMessage = "Broadcast address must be a valid IP.";
-            return;
-        }
-
-        if (
             !TryNormalizePath(
                 this.DownloadDirectory,
                 "Download directory",
@@ -368,8 +331,6 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
-        this.m_settings.Discovery.BroadcastPort = (ushort)this.BroadcastPort;
-        this.m_settings.Discovery.BroadcastAddress = broadcastAddress;
         this.m_settings.Discovery.BroadcastInterval = TimeSpan.FromSeconds(
             (int)this.BroadcastIntervalSeconds
         );
@@ -426,9 +387,6 @@ public sealed class SettingsViewModel : ReactiveObject
         this.StatusMessage = string.Empty;
 
         // Apply defaults to discovery settings.
-        this.m_settings.Discovery.BroadcastPort =
-            PeerDiscoveryOptions.DefaultBroadcastPort;
-        this.m_settings.Discovery.BroadcastAddress = IPAddress.Broadcast;
         this.m_settings.Discovery.BroadcastInterval =
             PeerDiscoveryOptions.DefaultBroadcastInterval;
         this.m_settings.Discovery.PeerTimeout =
