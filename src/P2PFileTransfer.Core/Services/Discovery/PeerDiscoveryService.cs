@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
+using P2PFileTransfer.Core.Serialization;
 using P2PFileTransfer.Core.Services.Security;
 using P2PFileTransfer.Core.Utilities;
 
@@ -65,6 +66,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         this.m_jsonOptions = new JsonSerializerOptions(
             JsonSerializerDefaults.Web
         );
+        // Add our own custom IP address serializer.
+        this.m_jsonOptions.Converters.Add(new IPAddressConverter());
     }
 
     /// <inheritdoc />
@@ -378,9 +381,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 {
                     PeerId = this.LocalPeerId,
                     DisplayName = displayName,
-                    IPAddress = NetworkUtilities
-                        .GetPrimaryIPv4Address()
-                        .ToString(),
+                    IPAddress = NetworkUtilities.GetPrimaryIPv4Address(),
                     TcpPort = this.m_tcpPort,
                     CertificateFingerprint = this.m_certificateFingerprint,
                     PublicKey = this.m_localPublicKey,
@@ -478,14 +479,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     continue;
                 }
 
-                IPAddress ipAddress;
-                if (
-                    string.IsNullOrWhiteSpace(announcement.IPAddress)
-                    || !IPAddress.TryParse(
-                        announcement.IPAddress,
-                        out ipAddress!
-                    )
-                )
+                IPAddress ipAddress = announcement.IPAddress;
+                if (ipAddress == null || ipAddress.Equals(IPAddress.None))
                 {
                     ipAddress = received.RemoteEndPoint.Address;
                 }
@@ -682,8 +677,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
         public string DisplayName { get; set; } = string.Empty;
 
-        // This should be a string because `IPAddress` isn't serializable.
-        public string IPAddress { get; set; } = string.Empty;
+        public IPAddress IPAddress { get; set; } = IPAddress.None;
 
         public ushort TcpPort { get; set; }
 
