@@ -19,9 +19,19 @@ namespace P2PFileTransfer.Core.Services.Discovery;
 /// </summary>
 public sealed class PeerDiscoveryService : IPeerDiscoveryService
 {
+    /// <summary>
+    /// The deduplication window. If a same peer sends an announcement within this window, it will be ignored.
+    /// </summary>
+    private static readonly TimeSpan s_deduplicationWindow =
+        TimeSpan.FromSeconds(10);
+
     private readonly ConcurrentDictionary<Guid, PeerInfo> m_peers = new();
     private readonly ConcurrentDictionary<Guid, string> m_verifiedPublicKeys =
         new();
+    private readonly ConcurrentDictionary<
+        Guid,
+        DateTimeOffset
+    > m_lastSeenTimestamps = new();
     private readonly PeerDiscoveryOptions m_options;
     private readonly JsonSerializerOptions m_jsonOptions;
     private readonly SemaphoreSlim m_stateLock = new(1, 1);
@@ -484,6 +494,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
                 DateTimeOffset now = DateTimeOffset.UtcNow;
 
+                // Cheap dedup check to avoid processing the same peer's announcement multiple times.
+                if (this.IsDuplicateAnnouncement(announcement.PeerId, now))
+                {
+                    continue;
+                }
+
                 string ipAddress = string.Empty;
                 if (string.IsNullOrWhiteSpace(announcement.IPAddress))
                 {
@@ -558,6 +574,38 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 // Ignore malformed payloads.
             }
         }
+    }
+
+    /// <summary>
+    /// Checks if an announcement from a peer should be considered a duplicate.
+    ///
+    /// <list type="bullet">
+    /// <item> If the announcement of the same peer is received within <see cref="s_deduplicationWindow"/>, it will be considered a duplicate.</item>
+    /// <item> Otherwise, the last-seen timestamp will be updated to the current timestamp.</item>
+    /// </list>
+    /// </summary>
+    /// <param name="peerId">The peer identifier.</param>
+    /// <param name="now">The current timestamp.</param>
+    /// <returns>True if the announcement is a duplicate within the deduplication window.</returns>
+    private bool IsDuplicateAnnouncement(Guid peerId, DateTimeOffset now)
+    {
+        DateTimeOffset lastSeen = this.m_lastSeenTimestamps.AddOrUpdate(
+            peerId,
+            now,
+            (_, existing) =>
+            {
+                // If within the deduplication window, keep the old timestamp.
+                if (now - existing < s_deduplicationWindow)
+                {
+                    return existing;
+                }
+
+                // Otherwise, update to the new timestamp.
+                return now;
+            }
+        );
+
+        return lastSeen != now;
     }
 
     /// <summary>
