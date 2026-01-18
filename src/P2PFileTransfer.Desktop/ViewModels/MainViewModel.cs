@@ -216,7 +216,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     {
         try
         {
-            // Load or create the local TLS certificate.
+            // Initialize the TLS certificate for file transfers.
             this.m_localCertificate =
                 this.m_certificateManager.GetOrCreateDefaultCertificate(
                     DefaultCertificatePassword
