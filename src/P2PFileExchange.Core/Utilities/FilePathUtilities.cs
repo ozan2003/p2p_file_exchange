@@ -13,25 +13,8 @@ public static class FilePathUtilities
     /// </summary>
     public static string GetDefaultDownloadDirectory()
     {
-        string userProfile = Environment.GetFolderPath(
-            Environment.SpecialFolder.UserProfile
-        );
-        if (string.IsNullOrWhiteSpace(userProfile))
-        {
-            userProfile = Environment.GetFolderPath(
-                Environment.SpecialFolder.MyDocuments
-            );
-        }
-
-        if (string.IsNullOrWhiteSpace(userProfile))
-        {
-            userProfile = Environment.CurrentDirectory;
-        }
-
-        return Path.Combine(
-            userProfile,
-            "Downloads",
-            AppConstants.AppDataDirectoryName
+        return Environment.GetFolderPath(
+            Environment.SpecialFolder.ApplicationData
         );
     }
 
