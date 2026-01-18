@@ -7,6 +7,7 @@ cross-platform Avalonia desktop UI.
 ## Features
 
 - Automatic peer discovery on the local network
+- ECDSA-signed discovery broadcasts to prevent peer impersonation
 - TLS-encrypted file transfers with certificate pinning
 - Per-chunk SHA-256 integrity validation
 - Drag-and-drop or file picker sending
@@ -52,6 +53,8 @@ Inbound files are saved to:
 
 ## Security
 
+### TLS Encryption
+
 All file transfers use TLS encryption with self-signed certificates. On first
 run, a certificate is generated and saved to:
 
@@ -62,6 +65,25 @@ run, a certificate is generated and saved to:
 
 Certificate fingerprints are exchanged during peer discovery and verified during
 TLS handshake to prevent man-in-the-middle attacks.
+
+### Discovery Signing
+
+Peer discovery broadcasts are authenticated using ECDSA (P-256) signatures. On
+first launch, a signing keypair is generated and saved alongside the certificate:
+
+```text
+~/.config/P2PFileTransfer/signing.key    (Linux)
+%APPDATA%\P2PFileTransfer\signing.key    (Windows)
+```
+
+Each discovery message includes:
+
+- Peer identity, display name, port, and certificate fingerprint
+- The sender's ECDSA public key
+- A signature over the above fields
+
+Receivers verify the signature before trusting the announcement. Messages with
+invalid signatures are discarded, preventing peer impersonation on the network.
 
 ## Project Layout
 

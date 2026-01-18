@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -18,6 +19,8 @@ namespace P2PFileTransfer.Core.Services;
 public sealed class PeerDiscoveryService : IPeerDiscoveryService
 {
     private readonly ConcurrentDictionary<Guid, PeerInfo> m_peers = new();
+    private readonly ConcurrentDictionary<Guid, string> m_verifiedPublicKeys =
+        new();
     private readonly PeerDiscoveryOptions m_options;
     private readonly JsonSerializerOptions m_jsonOptions;
     private readonly SemaphoreSlim m_stateLock = new(1, 1);
@@ -31,6 +34,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     private string m_displayName = string.Empty;
     private string m_certificateFingerprint = string.Empty;
     private int m_tcpPort;
+    private ECDsa? m_signingKey;
+    private string m_localPublicKey = string.Empty;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PeerDiscoveryService"/> class.
@@ -74,6 +79,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         int tcpPort,
         string displayName,
         string certificateFingerprint,
+        ECDsa signingKey,
         CancellationToken cancellationToken
     )
     {
@@ -81,6 +87,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         {
             throw new ArgumentOutOfRangeException(nameof(tcpPort));
         }
+
+        ArgumentNullException.ThrowIfNull(signingKey, nameof(signingKey));
 
         await this
             .m_stateLock.WaitAsync(cancellationToken)
@@ -96,6 +104,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             this.m_displayName = displayName?.Trim() ?? string.Empty;
             this.m_certificateFingerprint =
                 certificateFingerprint ?? string.Empty;
+            this.m_signingKey = signingKey;
+            this.m_localPublicKey = SigningKeyManager.ExportPublicKey(
+                signingKey
+            );
 
             this.m_discoveryCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
@@ -353,16 +365,37 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         {
             try
             {
+                string displayName = NormalizeDisplayName(this.m_displayName);
+
+                // Create the signature over the announcement data.
+                byte[] signingData =
+                    SigningKeyManager.CreateAnnouncementSigningData(
+                        this.LocalPeerId,
+                        displayName,
+                        this.m_tcpPort,
+                        this.m_certificateFingerprint
+                    );
+
+                string signature = string.Empty;
+                if (this.m_signingKey != null)
+                {
+                    signature = SigningKeyManager.SignDataToBase64(
+                        this.m_signingKey,
+                        signingData
+                    );
+                }
+
                 PeerAnnouncement announcement = new()
                 {
                     PeerId = this.LocalPeerId,
-                    DisplayName = NormalizeDisplayName(this.m_displayName),
+                    DisplayName = displayName,
                     IPAddress = NetworkUtilities
                         .GetPrimaryIPv4Address()
                         .ToString(),
                     TcpPort = this.m_tcpPort,
-                    // The fingerprint is included in every announcement.
                     CertificateFingerprint = this.m_certificateFingerprint,
+                    PublicKey = this.m_localPublicKey,
+                    Signature = signature,
                 };
 
                 byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
@@ -390,7 +423,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
     /// <summary>
     /// Continuously listens for peer announcements and updates the peer registry.
-    /// Ignores announcements from the local peer and malformed payloads.
+    /// Ignores announcements from the local peer, malformed payloads, and invalid signatures.
     /// </summary>
     /// <param name="client">The UDP client used for receiving announcements.</param>
     /// <param name="cancellationToken">A token to signal loop termination.</param>
@@ -438,6 +471,16 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     continue;
                 }
 
+                // Announcement signature is verified here.
+                if (!this.VerifyAnnouncementSignature(announcement))
+                {
+                    StatusChanged?.Invoke(
+                        this,
+                        $"Invalid signature from peer {announcement.PeerId}: discarding announcement."
+                    );
+                    continue;
+                }
+
                 DateTimeOffset now = DateTimeOffset.UtcNow;
 
                 string ipAddress = string.Empty;
@@ -449,6 +492,13 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 {
                     ipAddress = announcement.IPAddress;
                 }
+
+                // Store the verified public key for this peer.
+                this.m_verifiedPublicKeys.AddOrUpdate(
+                    announcement.PeerId,
+                    announcement.PublicKey,
+                    (_, _) => announcement.PublicKey
+                );
 
                 // Peers info is updated here.
                 PeerInfo peerInfo = this.m_peers.AddOrUpdate(
@@ -465,6 +515,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         LastSeen = now,
                         CertificateFingerprint =
                             announcement.CertificateFingerprint ?? string.Empty,
+                        PublicKey = announcement.PublicKey ?? string.Empty,
                     },
                     // Update existing peer info otherwise.
                     (_, existing) =>
@@ -477,6 +528,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         existing.LastSeen = now;
                         existing.CertificateFingerprint =
                             announcement.CertificateFingerprint ?? string.Empty;
+                        existing.PublicKey =
+                            announcement.PublicKey ?? string.Empty;
                         return existing;
                     }
                 );
@@ -503,6 +556,55 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             {
                 // Ignore malformed payloads.
             }
+        }
+    }
+
+    /// <summary>
+    /// Verifies the ECDSA signature on a peer announcement.
+    /// </summary>
+    /// <param name="announcement">The announcement to verify.</param>
+    /// <returns>True if the signature is valid; otherwise, false.</returns>
+    private bool VerifyAnnouncementSignature(PeerAnnouncement announcement)
+    {
+        if (string.IsNullOrWhiteSpace(announcement.PublicKey))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(announcement.Signature))
+        {
+            return false;
+        }
+
+        try
+        {
+            // Re-create the signing data from the announcement fields.
+            byte[] signingData =
+                SigningKeyManager.CreateAnnouncementSigningData(
+                    announcement.PeerId,
+                    announcement.DisplayName,
+                    announcement.TcpPort,
+                    announcement.CertificateFingerprint
+                );
+
+            // Re-import the public key and verify the signature.
+            using ECDsa publicKey = SigningKeyManager.ImportPublicKey(
+                announcement.PublicKey
+            );
+
+            return SigningKeyManager.VerifySignatureFromBase64(
+                publicKey,
+                signingData,
+                announcement.Signature
+            );
+        }
+        catch (CryptographicException)
+        {
+            return false;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 
@@ -556,5 +658,15 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         public int TcpPort { get; set; }
 
         public string CertificateFingerprint { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Base64-encoded ECDSA P-256 public key for signature verification.
+        /// </summary>
+        public string PublicKey { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Base64-encoded ECDSA signature over SHA256(PeerId + DisplayName + TcpPort + CertificateFingerprint).
+        /// </summary>
+        public string Signature { get; set; } = string.Empty;
     }
 }

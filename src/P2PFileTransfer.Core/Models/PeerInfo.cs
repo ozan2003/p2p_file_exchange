@@ -37,4 +37,10 @@ public sealed class PeerInfo
     /// Used for certificate pinning during TLS handshake validation.
     /// </summary>
     public string CertificateFingerprint { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The verified ECDSA public key of the peer (base64-encoded).
+    /// Used for verifying discovery broadcast signatures.
+    /// </summary>
+    public string PublicKey { get; set; } = string.Empty;
 }

@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
+using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -28,12 +29,14 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
     private readonly CertificateManager m_certificateManager;
+    private readonly SigningKeyManager m_signingKeyManager;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
     [];
 
     private X509Certificate2? m_localCertificate;
     private string m_localFingerprint = string.Empty;
+    private ECDsa? m_signingKey;
 
     private string m_displayName;
     private string m_statusMessage = "Ready.";
@@ -58,6 +61,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
         this.m_certificateManager = new CertificateManager();
+        this.m_signingKeyManager = new SigningKeyManager();
 
         this.m_displayName = GetDefaultDisplayName();
 
@@ -219,6 +223,10 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                     this.m_localCertificate
                 );
 
+            // Load or create the ECDSA signing key for discovery authentication.
+            this.m_signingKey =
+                this.m_signingKeyManager.GetOrCreateDefaultKeyPair();
+
             string downloadDirectory =
                 FilePathUtilities.GetDefaultDownloadDirectory();
             await ((FileTransferService)this.m_fileTransferService)
@@ -270,6 +278,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.SendFileCommand.Dispose();
 
         this.m_localCertificate?.Dispose();
+        this.m_signingKey?.Dispose();
     }
 
     private static string SanitizeDisplayName(string value)
@@ -296,6 +305,14 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             return;
         }
 
+        if (this.m_signingKey == null)
+        {
+            this.SetStatusMessage(
+                "Signing key not initialized. Restart the app."
+            );
+            return;
+        }
+
         this.SetBusy(true);
         try
         {
@@ -304,6 +321,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                     this.m_fileTransferService.ListenerPort,
                     this.DisplayName,
                     this.m_localFingerprint,
+                    this.m_signingKey,
                     CancellationToken.None
                 )
                 .ConfigureAwait(false);

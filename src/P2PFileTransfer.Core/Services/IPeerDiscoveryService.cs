@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileTransfer.Core.Models;
@@ -42,16 +43,18 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     int BroadcastPort { get; }
 
     /// <summary>
-    /// Starts discovery with the provided TCP listener port, display name, and certificate fingerprint for broadcasting.
+    /// Starts discovery with the provided TCP listener port, display name, certificate fingerprint, and signing key.
     /// </summary>
     /// <param name="tcpPort">The TCP port used for file transfers.</param>
     /// <param name="displayName">The display name for the local peer.</param>
     /// <param name="certificateFingerprint">The SHA-256 fingerprint of the local TLS certificate.</param>
+    /// <param name="signingKey">The ECDSA P-256 keypair for signing discovery broadcasts.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
         int tcpPort,
         string displayName,
         string certificateFingerprint,
+        ECDsa signingKey,
         CancellationToken cancellationToken
     );
 
