@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -37,7 +38,7 @@ internal static class FileChunker
     }
 
     /// <summary>
-    /// Reads file chunks asynchronously.
+    /// Reads file chunks asynchronously using pooled buffers for reduced memory allocation.
     /// </summary>
     /// <param name="stream">The file stream.</param>
     /// <param name="chunkSize">The chunk size in bytes.</param>
@@ -53,47 +54,60 @@ internal static class FileChunker
             throw new ArgumentOutOfRangeException(nameof(chunkSize));
         }
 
-        byte[] buffer = new byte[chunkSize]; // Repeteadly fill the chunks to here.
-        int chunkIndex = 0;
-
-        while (true)
+        // Rent a buffer from the shared pool to reduce allocations.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
+        try
         {
-            // Fill each chunks completely.
-            int totalRead = 0;
-            while (totalRead < chunkSize)
-            {
-                int bytesRead = await stream
-                    .ReadAsync(
-                        buffer.AsMemory(totalRead, chunkSize - totalRead),
-                        cancellationToken
-                    )
-                    .ConfigureAwait(false);
+            int chunkIndex = 0;
 
-                if (bytesRead == 0)
+            while (true)
+            {
+                // Fill each chunk completely.
+                int totalRead = 0;
+                while (totalRead < chunkSize)
                 {
-                    break; // End of stream
+                    int bytesRead = await stream
+                        .ReadAsync(
+                            buffer.AsMemory(totalRead, chunkSize - totalRead),
+                            cancellationToken
+                        )
+                        .ConfigureAwait(false);
+
+                    if (bytesRead == 0)
+                    {
+                        break; // End of stream
+                    }
+
+                    totalRead += bytesRead;
                 }
 
-                totalRead += bytesRead;
+                if (totalRead == 0)
+                {
+                    // Stream is exhausted.
+                    yield break;
+                }
+
+                // Create chunk data array only with the actual size needed.
+                // Note: We must copy here because the buffer is reused and pooled.
+                byte[] chunkData = GC.AllocateUninitializedArray<byte>(
+                    totalRead
+                );
+                buffer.AsSpan(0, totalRead).CopyTo(chunkData);
+                byte[] hash = SHA256.HashData(chunkData);
+
+                yield return new FileChunk
+                {
+                    ChunkIndex = chunkIndex,
+                    Data = chunkData,
+                    Hash = hash,
+                };
+
+                ++chunkIndex;
             }
-
-            if (totalRead == 0)
-            {
-                // Stream is exhausted.
-                yield break;
-            }
-
-            byte[] chunkData = buffer.AsSpan(0, totalRead).ToArray();
-            byte[] hash = SHA256.HashData(chunkData);
-
-            yield return new FileChunk
-            {
-                ChunkIndex = chunkIndex,
-                Data = chunkData,
-                Hash = hash,
-            };
-
-            ++chunkIndex;
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 }

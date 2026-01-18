@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.IO;
 using System.Text.Json;
@@ -241,11 +242,18 @@ internal static class FileTransferProtocol
         CancellationToken cancellationToken
     )
     {
-        byte[] buffer = new byte[sizeof(int)];
-        BinaryPrimitives.WriteInt32LittleEndian(buffer, value);
-        await stream
-            .WriteAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
-            .ConfigureAwait(false);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(sizeof(int));
+        try
+        {
+            BinaryPrimitives.WriteInt32LittleEndian(buffer, value);
+            await stream
+                .WriteAsync(buffer.AsMemory(0, sizeof(int)), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
     }
 
     /// <summary>
@@ -259,13 +267,57 @@ internal static class FileTransferProtocol
         CancellationToken cancellationToken
     )
     {
-        byte[] buffer = await ReadExactAsync(
-                stream,
-                sizeof(int),
-                cancellationToken
-            )
-            .ConfigureAwait(false);
-        return BinaryPrimitives.ReadInt32LittleEndian(buffer);
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(sizeof(int));
+        try
+        {
+            await ReadExactIntoBufferAsync(
+                    stream,
+                    buffer,
+                    sizeof(int),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+            return BinaryPrimitives.ReadInt32LittleEndian(buffer);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    /// <summary>
+    /// Reads exactly the specified number of bytes from the stream into a provided buffer.
+    /// </summary>
+    /// <param name="stream">The stream to read from.</param>
+    /// <param name="buffer">The buffer to read into.</param>
+    /// <param name="length">The exact number of bytes to read.</param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    /// <exception cref="EndOfStreamException">Thrown when the stream ends before all bytes are read.</exception>
+    private static async Task ReadExactIntoBufferAsync(
+        Stream stream,
+        byte[] buffer,
+        int length,
+        CancellationToken cancellationToken
+    )
+    {
+        int totalRead = 0;
+
+        while (totalRead < length)
+        {
+            int bytesRead = await stream
+                .ReadAsync(
+                    buffer.AsMemory(totalRead, length - totalRead),
+                    cancellationToken
+                )
+                .ConfigureAwait(false);
+
+            if (bytesRead == 0)
+            {
+                throw new EndOfStreamException("Unexpected end of stream.");
+            }
+
+            totalRead += bytesRead;
+        }
     }
 
     /// <summary>
@@ -288,25 +340,15 @@ internal static class FileTransferProtocol
             throw new InvalidDataException("Invalid length.");
         }
 
-        byte[] buffer = new byte[length];
-        int totalRead = 0;
-
-        while (totalRead < length)
-        {
-            int bytesRead = await stream
-                .ReadAsync(
-                    buffer.AsMemory(totalRead, length - totalRead),
-                    cancellationToken
-                )
-                .ConfigureAwait(false);
-
-            if (bytesRead == 0)
-            {
-                throw new EndOfStreamException("Unexpected end of stream.");
-            }
-
-            totalRead += bytesRead;
-        }
+        // Use uninitialized array for performance since we'll overwrite all bytes.
+        byte[] buffer = GC.AllocateUninitializedArray<byte>(length);
+        await ReadExactIntoBufferAsync(
+                stream,
+                buffer,
+                length,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
 
         return buffer;
     }
