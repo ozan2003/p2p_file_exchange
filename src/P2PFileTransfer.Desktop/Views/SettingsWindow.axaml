@@ -44,13 +44,16 @@
                 <TextBlock Text="Discovery"
                            FontWeight="SemiBold"
                            FontSize="14" />
-                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
                                Text="Broadcast interval (seconds)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="0"
                                    Grid.Column="1"
                                    Value="{Binding BroadcastIntervalSeconds}"
+                                   Width="150"
+                                   HorizontalAlignment="Right"
                                    Minimum="1"
                                    Maximum="3600"
                                    Increment="1"
@@ -59,7 +62,8 @@
 
                     <TextBlock Grid.Row="1"
                                Text="Peer timeout (seconds)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="1"
                                    Grid.Column="1"
                                    Value="{Binding PeerTimeoutSeconds}"
@@ -67,11 +71,14 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="15" />
+                                   Watermark="15"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
 
                     <TextBlock Grid.Row="2"
                                Text="Cleanup interval (seconds)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="2"
                                    Grid.Column="1"
                                    Value="{Binding CleanupIntervalSeconds}"
@@ -79,16 +86,19 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="5" />
+                                   Watermark="5"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
                 </Grid>
 
                 <TextBlock Text="Transfer"
                            FontWeight="SemiBold"
                            FontSize="14" />
-                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
                                Text="Chunk size (KiB)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="0"
                                    Grid.Column="1"
                                    Value="{Binding ChunkSizeKiB}"
@@ -96,11 +106,14 @@
                                    Maximum="65536"
                                    Increment="64"
                                    FormatString="0"
-                                   Watermark="256" />
+                                   Watermark="256"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
 
                     <TextBlock Grid.Row="1"
                                Text="Buffer size (KiB)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="1"
                                    Grid.Column="1"
                                    Value="{Binding BufferSizeKiB}"
@@ -108,11 +121,14 @@
                                    Maximum="65536"
                                    Increment="16"
                                    FormatString="0"
-                                   Watermark="80" />
+                                   Watermark="80"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
 
                     <TextBlock Grid.Row="2"
                                Text="TLS handshake timeout (seconds)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="2"
                                    Grid.Column="1"
                                    Value="{Binding TlsHandshakeTimeoutSeconds}"
@@ -120,11 +136,14 @@
                                    Maximum="300"
                                    Increment="5"
                                    FormatString="0"
-                                   Watermark="10" />
+                                   Watermark="10"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
 
                     <TextBlock Grid.Row="3"
                                Text="Transfer request timeout (seconds)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="3"
                                    Grid.Column="1"
                                    Value="{Binding TransferRequestTimeoutSeconds}"
@@ -132,16 +151,19 @@
                                    Maximum="600"
                                    Increment="30"
                                    FormatString="0"
-                                   Watermark="120" />
+                                   Watermark="120"
+                                   Width="150"
+                                   HorizontalAlignment="Right" />
                 </Grid>
 
                 <TextBlock Text="Download"
                            FontWeight="SemiBold"
                            FontSize="14" />
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
                                Text="Download directory"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <TextBox Grid.Row="0"
                              Grid.Column="1"
                              Text="{Binding DownloadDirectory, Mode=TwoWay}" />
@@ -155,10 +177,11 @@
                 <TextBlock Text="Security"
                            FontWeight="SemiBold"
                            FontSize="14" />
-                <Grid ColumnDefinitions="220,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
                                Text="Certificate path"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <TextBox Grid.Row="0"
                              Grid.Column="1"
                              Text="{Binding CertificatePath, Mode=TwoWay}" />
@@ -170,7 +193,8 @@
 
                     <TextBlock Grid.Row="1"
                                Text="Certificate validity (years)"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <NumericUpDown Grid.Row="1"
                                    Grid.Column="1"
                                    Value="{Binding CertificateValidityYears}"
@@ -178,11 +202,14 @@
                                    Maximum="100"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="10" />
+                                   Watermark="10"
+                                   Width="150"
+                                   HorizontalAlignment="Left" />
 
                     <TextBlock Grid.Row="2"
                                Text="Signing key path"
-                               VerticalAlignment="Center" />
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Left" />
                     <TextBox Grid.Row="2"
                              Grid.Column="1"
                              Text="{Binding SigningKeyPath, Mode=TwoWay}" />
