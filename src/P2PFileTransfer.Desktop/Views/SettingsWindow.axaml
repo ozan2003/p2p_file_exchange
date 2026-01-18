@@ -9,6 +9,12 @@
         MinWidth="640"
         MinHeight="480"
         WindowStartupLocation="CenterOwner">
+    <Window.Styles>
+        <Style Selector="NumericUpDown.warning /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="#e74c3c" />
+            <Setter Property="BorderThickness" Value="2" />
+        </Style>
+    </Window.Styles>
     <DockPanel>
         <Border DockPanel.Dock="Bottom"
                 Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
@@ -58,7 +64,8 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="5" />
+                                   Watermark="5"
+                                   Classes.warning="{Binding HasPeerTimeoutWarning}" />
 
                     <TextBlock Grid.Row="1"
                                Text="Peer timeout (seconds)"
@@ -73,7 +80,8 @@
                                    FormatString="0"
                                    Watermark="15"
                                    Width="150"
-                                   HorizontalAlignment="Right" />
+                                   HorizontalAlignment="Right"
+                                   Classes.warning="{Binding HasPeerTimeoutWarning}" />
 
                     <TextBlock Grid.Row="2"
                                Text="Cleanup interval (seconds)"
@@ -90,6 +98,13 @@
                                    Width="150"
                                    HorizontalAlignment="Right" />
                 </Grid>
+                <TextBlock Text="Broadcast interval is less than peer timeout; peers may dissapear often before they update their presence.
+                "
+                           Foreground="#e74c3c"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding HasPeerTimeoutWarning}"
+                           Margin="0,-8,0,0" />
 
                 <TextBlock Text="Transfer"
                            FontWeight="SemiBold"

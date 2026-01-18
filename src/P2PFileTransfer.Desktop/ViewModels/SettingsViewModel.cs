@@ -88,11 +88,14 @@ public sealed class SettingsViewModel : ReactiveObject
     public decimal BroadcastIntervalSeconds
     {
         get => this.m_broadcastIntervalSeconds;
-        set =>
+        set
+        {
             this.RaiseAndSetIfChanged(
                 ref this.m_broadcastIntervalSeconds,
                 value
             );
+            this.RaisePropertyChanged(nameof(this.HasPeerTimeoutWarning));
+        }
     }
 
     /// <summary>
@@ -101,7 +104,11 @@ public sealed class SettingsViewModel : ReactiveObject
     public decimal PeerTimeoutSeconds
     {
         get => this.m_peerTimeoutSeconds;
-        set => this.RaiseAndSetIfChanged(ref this.m_peerTimeoutSeconds, value);
+        set
+        {
+            this.RaiseAndSetIfChanged(ref this.m_peerTimeoutSeconds, value);
+            this.RaisePropertyChanged(nameof(this.HasPeerTimeoutWarning));
+        }
     }
 
     /// <summary>
@@ -206,6 +213,13 @@ public sealed class SettingsViewModel : ReactiveObject
         get => this.m_statusMessage;
         set => this.RaiseAndSetIfChanged(ref this.m_statusMessage, value);
     }
+
+    /// <summary>
+    /// Gets a value indicating whether the peer timeout is less than or equal to the broadcast interval,
+    /// which could cause peers to disappear frequently.
+    /// </summary>
+    public bool HasPeerTimeoutWarning =>
+        this.PeerTimeoutSeconds < this.BroadcastIntervalSeconds;
 
     /// <summary>
     /// Command to save settings.
