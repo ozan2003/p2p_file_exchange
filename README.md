@@ -16,8 +16,8 @@ all accessible through a cross-platform desktop UI built with Avalonia.
 
 ## Screenshots
 
-![Main window](assets/p2p_mainscreen.png)
-![Receiving transfer](assets/p2p_receiving.png)
+[![p2p_mainscreen.png](https://i.postimg.cc/SxdCCqDX/p2p_mainscreen.png)](https://postimg.cc/6878Nssw)
+[![p2p_receiving.png](https://i.postimg.cc/P5yYYh2p/p2p_receiving.png)](https://postimg.cc/NKyKwhhB)
 
 > [!NOTE]
 > Peer discovery uses UDP broadcast, so devices must be on the same LAN.
