@@ -377,7 +377,11 @@ public sealed class FileTransferService : IFileTransferService
                 progress?.Report(progressPercent);
                 TransferProgressChanged?.Invoke(
                     this,
-                    new TransferProgressEventArgs(transferId, progressPercent)
+                    new TransferProgressEventArgs(
+                        transferId,
+                        TransferMode.Send,
+                        progressPercent
+                    )
                 );
             }
 
@@ -705,7 +709,11 @@ public sealed class FileTransferService : IFileTransferService
                 );
                 TransferProgressChanged?.Invoke(
                     this,
-                    new TransferProgressEventArgs(transferId, progressPercent)
+                    new TransferProgressEventArgs(
+                        transferId,
+                        TransferMode.Receive,
+                        progressPercent
+                    )
                 );
             }
 
