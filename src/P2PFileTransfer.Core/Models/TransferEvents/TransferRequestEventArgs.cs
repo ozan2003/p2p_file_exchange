@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 
 namespace P2PFileTransfer.Core.Models.TransferEvents;
 
@@ -19,7 +20,7 @@ public sealed class TransferRequestEventArgs : EventArgs
     public TransferRequestEventArgs(
         Guid requestId,
         FileMetadata metadata,
-        string remoteEndpoint,
+        IPEndPoint remoteEndpoint,
         string? senderDisplayName
     )
     {
@@ -42,7 +43,7 @@ public sealed class TransferRequestEventArgs : EventArgs
     /// <summary>
     /// The remote endpoint of the sender (IP:Port).
     /// </summary>
-    public string RemoteEndpoint { get; }
+    public IPEndPoint RemoteEndpoint { get; }
 
     /// <summary>
     /// The display name of the sender, if known from peer discovery.

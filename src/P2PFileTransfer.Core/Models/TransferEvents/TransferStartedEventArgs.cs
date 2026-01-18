@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 
 namespace P2PFileTransfer.Core.Models.TransferEvents;
 
@@ -19,7 +20,7 @@ public sealed class TransferStartedEventArgs : EventArgs
         Guid transferId,
         TransferMode mode,
         FileMetadata metadata,
-        string remoteEndpoint,
+        IPEndPoint remoteEndpoint,
         string filePath
     )
     {
@@ -48,7 +49,7 @@ public sealed class TransferStartedEventArgs : EventArgs
     /// <summary>
     /// The remote endpoint.
     /// </summary>
-    public string RemoteEndpoint { get; }
+    public IPEndPoint RemoteEndpoint { get; }
 
     /// <summary>
     /// The local file path used for the transfer.

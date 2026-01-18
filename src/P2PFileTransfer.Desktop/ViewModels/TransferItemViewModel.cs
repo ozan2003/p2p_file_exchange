@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Net;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
 using P2PFileTransfer.Core.Models;
@@ -45,7 +46,7 @@ public sealed class TransferItemViewModel : ReactiveObject
         TransferMode mode,
         string fileName,
         long totalBytes,
-        string remoteEndpoint
+        IPEndPoint remoteEndpoint
     )
     {
         this.TransferId = transferId;
@@ -77,7 +78,7 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// <summary>
     /// The remote endpoint.
     /// </summary>
-    public string RemoteEndpoint { get; }
+    public IPEndPoint RemoteEndpoint { get; }
 
     /// <summary>
     /// The formatted total file size.

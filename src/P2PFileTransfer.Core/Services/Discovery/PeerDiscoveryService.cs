@@ -220,39 +220,33 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
-    public string? GetPeerFingerprintByIPAddress(string ipAddress)
+    public string? GetPeerFingerprintByIPAddress(IPAddress ipAddress)
     {
-        if (string.IsNullOrWhiteSpace(ipAddress))
+        if (ipAddress == null)
         {
             return null;
         }
 
         return this
             .m_peers.Values.FirstOrDefault(peer =>
-                string.Equals(
-                    peer.IPAddress,
-                    ipAddress,
-                    StringComparison.OrdinalIgnoreCase
-                ) && !string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
+                peer.IPAddress == ipAddress
+                && !string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
             )
             ?.CertificateFingerprint;
     }
 
     /// <inheritdoc />
-    public string? GetPeerDisplayNameByIPAddress(string ipAddress)
+    public string? GetPeerDisplayNameByIPAddress(IPAddress ipAddress)
     {
-        if (string.IsNullOrWhiteSpace(ipAddress))
+        if (ipAddress == null)
         {
             return null;
         }
 
         return this
             .m_peers.Values.FirstOrDefault(peer =>
-                string.Equals(
-                    peer.IPAddress,
-                    ipAddress,
-                    StringComparison.OrdinalIgnoreCase
-                ) && !string.IsNullOrWhiteSpace(peer.DisplayName)
+                peer.IPAddress == ipAddress
+                && !string.IsNullOrWhiteSpace(peer.DisplayName)
             )
             ?.DisplayName;
     }
@@ -484,14 +478,16 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     continue;
                 }
 
-                string ipAddress = string.Empty;
-                if (string.IsNullOrWhiteSpace(announcement.IPAddress))
+                IPAddress ipAddress;
+                if (
+                    string.IsNullOrWhiteSpace(announcement.IPAddress)
+                    || !IPAddress.TryParse(
+                        announcement.IPAddress,
+                        out ipAddress!
+                    )
+                )
                 {
-                    ipAddress = received.RemoteEndPoint.Address.ToString();
-                }
-                else
-                {
-                    ipAddress = announcement.IPAddress;
+                    ipAddress = received.RemoteEndPoint.Address;
                 }
 
                 // Store the verified public key for this peer.
@@ -686,6 +682,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
         public string DisplayName { get; set; } = string.Empty;
 
+        // This should be a string because `IPAddress` isn't serializable.
         public string IPAddress { get; set; } = string.Empty;
 
         public int TcpPort { get; set; }

@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 
 namespace P2PFileTransfer.Core.Models;
 
@@ -20,7 +21,7 @@ public sealed class PeerInfo
     /// <summary>
     /// The IPv4 address of the peer.
     /// </summary>
-    public string IPAddress { get; set; } = string.Empty;
+    public IPAddress IPAddress { get; set; } = IPAddress.None;
 
     /// <summary>
     /// The TCP port used for file transfers.

@@ -49,8 +49,8 @@ public sealed class FileTransferService : IFileTransferService
     private Task? m_acceptLoopTask;
     private string m_downloadDirectory = string.Empty;
     private X509Certificate2? m_certificate;
-    private Func<string, string?>? m_fingerprintLookup;
-    private Func<string, string?>? m_displayNameLookup;
+    private Func<IPAddress, string?>? m_fingerprintLookup;
+    private Func<IPAddress, string?>? m_displayNameLookup;
 
     /// <inheritdoc />
     public event EventHandler<TransferRequestEventArgs>? TransferRequestReceived;
@@ -75,7 +75,7 @@ public sealed class FileTransferService : IFileTransferService
         int port,
         string downloadDirectory,
         X509Certificate2 certificate,
-        Func<string, string?> fingerprintLookup,
+        Func<IPAddress, string?> fingerprintLookup,
         CancellationToken cancellationToken
     )
     {
@@ -109,8 +109,8 @@ public sealed class FileTransferService : IFileTransferService
         int port,
         string downloadDirectory,
         X509Certificate2 certificate,
-        Func<string, string?> fingerprintLookup,
-        Func<string, string?>? displayNameLookup,
+        Func<IPAddress, string?> fingerprintLookup,
+        Func<IPAddress, string?>? displayNameLookup,
         CancellationToken cancellationToken
     )
     {
@@ -254,11 +254,6 @@ public sealed class FileTransferService : IFileTransferService
             throw new FileNotFoundException("File not found.", filePath);
         }
 
-        if (!IPAddress.TryParse(peer.IPAddress, out IPAddress? remoteAddress))
-        {
-            throw new InvalidOperationException("Peer IP address is invalid.");
-        }
-
         FileInfo fileInfo = new(filePath);
         int totalChunks = FileChunker.CalculateTotalChunkNumber(
             fileInfo.Length
@@ -279,7 +274,7 @@ public sealed class FileTransferService : IFileTransferService
                 transferId,
                 TransferMode.Send,
                 metadata,
-                $"{peer.IPAddress}:{peer.TcpPort}",
+                new IPEndPoint(peer.IPAddress, peer.TcpPort),
                 filePath
             )
         );
@@ -289,7 +284,7 @@ public sealed class FileTransferService : IFileTransferService
             // Connect to the peer via TCP.
             using TcpClient client = new();
             await client
-                .ConnectAsync(remoteAddress, peer.TcpPort, cancellationToken)
+                .ConnectAsync(peer.IPAddress, peer.TcpPort, cancellationToken)
                 .ConfigureAwait(false);
             client.NoDelay = true;
 
@@ -541,7 +536,7 @@ public sealed class FileTransferService : IFileTransferService
         Guid transferId = Guid.NewGuid();
         string destinationPath = string.Empty;
         bool shouldDeleteFile = false;
-        string remoteIpAddress = string.Empty;
+        IPAddress remoteIpAddress = IPAddress.None;
 
         try
         {
@@ -550,11 +545,16 @@ public sealed class FileTransferService : IFileTransferService
             // Extract remote IP for fingerprint lookup.
             if (tcpClient.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
             {
-                remoteIpAddress = remoteEndPoint.Address.ToString();
+                remoteIpAddress = remoteEndPoint.Address;
             }
 
-            string remoteEndpointString =
-                tcpClient.Client.RemoteEndPoint?.ToString() ?? "Unknown";
+            IPEndPoint? remoteEndpoint = (IPEndPoint?)
+                tcpClient.Client.RemoteEndPoint;
+
+            ArgumentNullException.ThrowIfNull(
+                remoteEndpoint,
+                nameof(remoteEndpoint)
+            );
 
             await using NetworkStream networkStream = tcpClient.GetStream();
 
@@ -566,7 +566,7 @@ public sealed class FileTransferService : IFileTransferService
                     this.ValidateRemoteCertificate(
                         certificate,
                         remoteIpAddress,
-                        remoteEndpointString
+                        remoteEndpoint
                     )
             );
 
@@ -605,7 +605,7 @@ public sealed class FileTransferService : IFileTransferService
                 new TransferRequestEventArgs(
                     requestId,
                     metadata,
-                    remoteEndpointString,
+                    remoteEndpoint,
                     senderDisplayName
                 )
             );
@@ -660,7 +660,7 @@ public sealed class FileTransferService : IFileTransferService
                     transferId,
                     TransferMode.Receive,
                     metadata,
-                    remoteEndpointString,
+                    remoteEndpoint,
                     destinationPath
                 )
             );
@@ -794,12 +794,12 @@ public sealed class FileTransferService : IFileTransferService
     /// </summary>
     /// <param name="certificate">The certificate presented by the remote peer.</param>
     /// <param name="remoteIpAddress">The IP address of the remote peer.</param>
-    /// <param name="remoteEndpoint">The full remote endpoint string for logging.</param>
+    /// <param name="remoteEndpoint">The full remote endpoint for logging.</param>
     /// <returns>True if the certificate is valid; otherwise, false.</returns>
     private bool ValidateRemoteCertificate(
         X509Certificate? certificate,
-        string remoteIpAddress,
-        string remoteEndpoint
+        IPAddress remoteIpAddress,
+        IPEndPoint remoteEndpoint
     )
     {
         // If no certificate is presented, allow (server mode with ClientCertificateRequired=false).

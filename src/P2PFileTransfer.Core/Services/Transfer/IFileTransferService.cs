@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,7 +59,7 @@ public interface IFileTransferService : IAsyncDisposable
         int port,
         string downloadDirectory,
         X509Certificate2 certificate,
-        Func<string, string?> fingerprintLookup,
+        Func<IPAddress, string?> fingerprintLookup,
         CancellationToken cancellationToken
     );
 

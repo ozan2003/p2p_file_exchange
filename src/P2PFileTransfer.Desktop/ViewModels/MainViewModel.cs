@@ -459,7 +459,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         // Show confirmation dialog on UI thread.
         Dispatcher.UIThread.Post(async () =>
         {
-            string senderName = args.SenderDisplayName ?? args.RemoteEndpoint;
+            string senderName =
+                args.SenderDisplayName ?? args.RemoteEndpoint.ToString();
             bool accepted = await this
                 .m_fileDialogService.ShowTransferConfirmationAsync(
                     senderName,

@@ -1,4 +1,5 @@
 using System;
+using System.Net;
 using P2PFileTransfer.Core.Models;
 using ReactiveUI;
 
@@ -10,7 +11,7 @@ namespace P2PFileTransfer.Desktop.ViewModels;
 public sealed class PeerItemViewModel : ReactiveObject
 {
     private string m_displayName;
-    private string m_ipAddress;
+    private IPAddress m_ipAddress;
     private int m_tcpPort;
     private DateTimeOffset m_lastSeen;
 
@@ -44,7 +45,7 @@ public sealed class PeerItemViewModel : ReactiveObject
     /// <summary>
     /// The IPv4 address.
     /// </summary>
-    public string IPAddress
+    public IPAddress IPAddress
     {
         get => this.m_ipAddress;
         set
@@ -81,9 +82,9 @@ public sealed class PeerItemViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// The formatted endpoint.
+    /// The endpoint.
     /// </summary>
-    public string Endpoint => $"{this.IPAddress}:{this.TcpPort}";
+    public IPEndPoint Endpoint => new(this.IPAddress, this.TcpPort);
 
     /// <summary>
     /// A human-readable "last seen" text.
@@ -111,7 +112,7 @@ public sealed class PeerItemViewModel : ReactiveObject
         {
             PeerId = this.PeerId,
             DisplayName = this.DisplayName,
-            IPAddress = this.IPAddress,
+            IPAddress = this.m_ipAddress,
             TcpPort = this.TcpPort,
             LastSeen = DateTimeOffset.UtcNow,
         };
