@@ -5,7 +5,10 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using P2PFileTransfer.Core.Services.Discovery;
+using P2PFileTransfer.Core.Services.Security;
 using P2PFileTransfer.Core.Services.Transfer;
+using P2PFileTransfer.Core.Utilities;
 using P2PFileTransfer.Desktop.Services;
 using P2PFileTransfer.Desktop.Settings;
 using ReactiveUI;
@@ -71,6 +74,9 @@ public sealed class SettingsViewModel : ReactiveObject
         );
         this.BrowseSigningKeyPathCommand = ReactiveCommand.CreateFromTask(
             this.BrowseSigningKeyPathAsync
+        );
+        this.ResetToDefaultsCommand = ReactiveCommand.Create(
+            this.ResetToDefaults
         );
     }
 
@@ -249,6 +255,11 @@ public sealed class SettingsViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> BrowseSigningKeyPathCommand { get; }
 
     /// <summary>
+    /// Command to reset all settings to their default values.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ResetToDefaultsCommand { get; }
+
+    /// <summary>
     /// Loads persisted settings into editable fields.
     /// </summary>
     private void LoadFromSettings()
@@ -405,6 +416,73 @@ public sealed class SettingsViewModel : ReactiveObject
         }
 
         this.RequestClose?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Resets all settings to their default values, persists them, and updates the UI.
+    /// </summary>
+    private void ResetToDefaults()
+    {
+        this.StatusMessage = string.Empty;
+
+        // Apply defaults to discovery settings.
+        this.m_settings.Discovery.BroadcastPort =
+            PeerDiscoveryOptions.DefaultBroadcastPort;
+        this.m_settings.Discovery.BroadcastAddress = IPAddress.Broadcast;
+        this.m_settings.Discovery.BroadcastInterval =
+            PeerDiscoveryOptions.DefaultBroadcastInterval;
+        this.m_settings.Discovery.PeerTimeout =
+            PeerDiscoveryOptions.DefaultPeerTimeout;
+        this.m_settings.Discovery.CleanupInterval =
+            PeerDiscoveryOptions.DefaultCleanupInterval;
+
+        // Apply defaults to transfer settings.
+        this.m_settings.Transfer.ChunkSize =
+            FileTransferOptions.DefaultChunkSize;
+        this.m_settings.Transfer.BufferSize =
+            FileTransferOptions.DefaultBufferSize;
+        this.m_settings.Transfer.TlsHandshakeTimeout =
+            FileTransferOptions.DefaultTlsHandshakeTimeout;
+        this.m_settings.Transfer.TransferRequestTimeout =
+            FileTransferOptions.DefaultTransferRequestTimeout;
+
+        // Apply defaults to download and security settings.
+        this.m_settings.DownloadDirectory =
+            FilePathUtilities.GetDefaultDownloadDirectory();
+        this.m_settings.Security.CertificatePath =
+            CertificateManager.DefaultCertificatePath;
+        this.m_settings.Security.CertificateValidityYears =
+            CertificateManager.DefaultValidityYears;
+        this.m_settings.Security.SigningKeyPath =
+            SigningKeyManager.DefaultSigningKeyPath;
+
+        try
+        {
+            this.m_settingsStore.Save(this.m_settings);
+        }
+        catch (IOException)
+        {
+            this.StatusMessage = "Failed to save default settings to disk.";
+            return;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            this.StatusMessage = "Settings file is not accessible.";
+            return;
+        }
+
+        // Update the download directory in the transfer service.
+        if (this.m_fileTransferService is FileTransferService transferService)
+        {
+            transferService.UpdateDownloadDirectory(
+                this.m_settings.DownloadDirectory
+            );
+        }
+
+        // Reload the UI fields from the updated settings.
+        this.LoadFromSettings();
+
+        this.StatusMessage = "Settings reverted to default.";
     }
 
     /// <summary>

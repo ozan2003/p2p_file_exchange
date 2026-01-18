@@ -15,19 +15,22 @@
                 BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
                 BorderThickness="0,1,0,0"
                 Padding="12,8">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-                <TextBlock Grid.Column="0"
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="12">
+                <Button Grid.Column="0"
+                        Content="Reset to Defaults"
+                        Command="{Binding ResetToDefaultsCommand}" />
+                <TextBlock Grid.Column="1"
                            Text="{Binding StatusMessage}"
                            Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
                            VerticalAlignment="Center"
                            TextWrapping="Wrap"
                            IsVisible="{Binding StatusMessage.Length}" />
-                <Button Grid.Column="1"
+                <Button Grid.Column="2"
                         Content="Cancel"
                         MinWidth="80"
                         IsCancel="True"
                         Command="{Binding CancelCommand}" />
-                <Button Grid.Column="2"
+                <Button Grid.Column="3"
                         Content="Save"
                         MinWidth="80"
                         Classes="accent"
