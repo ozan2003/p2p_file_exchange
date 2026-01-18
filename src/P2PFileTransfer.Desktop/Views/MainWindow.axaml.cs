@@ -20,6 +20,9 @@ public partial class MainWindow : Window
         this.AddHandler(DragDrop.DragOverEvent, this.OnDragOver);
     }
 
+    /// <summary>
+    /// Handles drag-over to indicate supported drop content.
+    /// </summary>
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         // Only accept file drops
@@ -30,6 +33,9 @@ public partial class MainWindow : Window
 #pragma warning restore CS0618
     }
 
+    /// <summary>
+    /// Sends files dropped onto the window.
+    /// </summary>
     private async void OnDrop(object? sender, DragEventArgs e)
     {
         if (this.DataContext is not MainViewModel viewModel)
@@ -73,6 +79,21 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// Opens the settings window.
+    /// </summary>
+    private void OnOpenSettingsClick(
+        object? sender,
+        Avalonia.Interactivity.RoutedEventArgs e
+    )
+    {
+        SettingsWindow settingsWindow = new();
+        _ = settingsWindow.ShowDialog(this);
+    }
+
+    /// <summary>
+    /// Removes a transfer entry from the UI.
+    /// </summary>
     private void OnRemoveTransferClick(
         object? sender,
         Avalonia.Interactivity.RoutedEventArgs e

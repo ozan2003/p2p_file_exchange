@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -6,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using P2PFileTransfer.Core.Services.Discovery;
 using P2PFileTransfer.Core.Services.Transfer;
 using P2PFileTransfer.Desktop.Services;
+using P2PFileTransfer.Desktop.Settings;
 using P2PFileTransfer.Desktop.ViewModels;
 using P2PFileTransfer.Desktop.Views;
 
@@ -51,15 +53,49 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
+    /// <summary>
+    /// Registers application services and view models.
+    /// </summary>
     private static ServiceProvider ConfigureServices()
     {
         ServiceCollection services = new();
-        services.AddSingleton<IPeerDiscoveryService, PeerDiscoveryService>();
-        services.AddSingleton<IFileTransferService, FileTransferService>();
+        SettingsStore settingsStore = new();
+        AppSettings appSettings = settingsStore.Load();
+
+        services.AddSingleton(settingsStore);
+        services.AddSingleton(appSettings);
+        services.AddSingleton(appSettings.Discovery);
+        services.AddSingleton(appSettings.Transfer);
+
+        services.AddSingleton<IPeerDiscoveryService>(
+            provider => new PeerDiscoveryService(
+                provider.GetRequiredService<PeerDiscoveryOptions>()
+            )
+        );
+        services.AddSingleton<IFileTransferService>(
+            provider => new FileTransferService(
+                provider.GetRequiredService<FileTransferOptions>()
+            )
+        );
         services.AddSingleton<IWindowProvider, WindowProvider>();
         services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<MainViewModel>();
+        services.AddTransient<SettingsViewModel>();
         return services.BuildServiceProvider();
+    }
+
+    /// <summary>
+    /// Resolves a required service from the application service provider.
+    /// </summary>
+    internal T GetRequiredService<T>()
+        where T : notnull
+    {
+        if (this.m_serviceProvider == null)
+        {
+            throw new InvalidOperationException("Services are not available.");
+        }
+
+        return this.m_serviceProvider.GetRequiredService<T>();
     }
 
     private async Task ShutdownAsync()

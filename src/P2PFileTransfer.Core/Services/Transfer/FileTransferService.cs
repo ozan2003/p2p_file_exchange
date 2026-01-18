@@ -21,11 +21,7 @@ namespace P2PFileTransfer.Core.Services.Transfer;
 /// </summary>
 public sealed class FileTransferService : IFileTransferService
 {
-    private const int DefaultBufferSize = 80 * 1024; // 80 KiB
-    private static readonly TimeSpan s_tlsHandshakeTimeout =
-        TimeSpan.FromSeconds(10);
-    private static readonly TimeSpan s_transferRequestTimeout =
-        TimeSpan.FromMinutes(2);
+    private readonly FileTransferOptions m_options;
 
     /// <summary>
     /// Lock for TCP listener.
@@ -51,6 +47,22 @@ public sealed class FileTransferService : IFileTransferService
     private X509Certificate2? m_certificate;
     private Func<IPAddress, string?>? m_fingerprintLookup;
     private Func<IPAddress, string?>? m_displayNameLookup;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileTransferService"/> class.
+    /// </summary>
+    public FileTransferService()
+        : this(new FileTransferOptions()) { }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="FileTransferService"/> class with options.
+    /// </summary>
+    /// <param name="options">The file transfer options.</param>
+    public FileTransferService(FileTransferOptions options)
+    {
+        this.m_options =
+            options ?? throw new ArgumentNullException(nameof(options));
+    }
 
     /// <inheritdoc />
     public event EventHandler<TransferRequestEventArgs>? TransferRequestReceived;
@@ -215,6 +227,24 @@ public sealed class FileTransferService : IFileTransferService
         }
     }
 
+    /// <summary>
+    /// Updates the download directory used for inbound transfers.
+    /// </summary>
+    /// <param name="downloadDirectory">The target download directory.</param>
+    public void UpdateDownloadDirectory(string downloadDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(downloadDirectory))
+        {
+            throw new ArgumentException(
+                "Download directory is required.",
+                nameof(downloadDirectory)
+            );
+        }
+
+        Directory.CreateDirectory(downloadDirectory);
+        this.m_downloadDirectory = downloadDirectory;
+    }
+
     /// <inheritdoc />
     public void RespondToTransferRequest(
         Guid requestId,
@@ -255,14 +285,15 @@ public sealed class FileTransferService : IFileTransferService
 
         FileInfo fileInfo = new(filePath);
         int totalChunks = FileChunker.CalculateTotalChunkNumber(
-            fileInfo.Length
+            fileInfo.Length,
+            this.m_options.ChunkSize
         );
         FileMetadata metadata = new()
         {
             FileName = Path.GetFileName(filePath),
             FileSize = fileInfo.Length,
             TotalChunksNumber = totalChunks,
-            ChunkSize = FileChunker.DefaultChunkSize,
+            ChunkSize = this.m_options.ChunkSize,
         };
 
         // Create a unique transfer ID and notify the UI that the transfer has started.
@@ -302,7 +333,7 @@ public sealed class FileTransferService : IFileTransferService
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            tlsTimeoutCts.CancelAfter(s_tlsHandshakeTimeout);
+            tlsTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
 
             await sslStream
                 .AuthenticateAsClientAsync(
@@ -346,7 +377,7 @@ public sealed class FileTransferService : IFileTransferService
                 FileMode.Open,
                 FileAccess.Read,
                 FileShare.Read,
-                bufferSize: DefaultBufferSize,
+                bufferSize: this.m_options.BufferSize,
                 useAsync: true
             );
 
@@ -570,6 +601,11 @@ public sealed class FileTransferService : IFileTransferService
             );
 
             // Authenticate as server with our certificate.
+            using CancellationTokenSource tlsTimeoutCts =
+                CancellationTokenSource.CreateLinkedTokenSource(
+                    cancellationToken
+                );
+            tlsTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
             await encryptedStream
                 .AuthenticateAsServerAsync(
                     new SslServerAuthenticationOptions
@@ -579,7 +615,7 @@ public sealed class FileTransferService : IFileTransferService
                         CertificateRevocationCheckMode =
                             X509RevocationMode.NoCheck,
                     },
-                    cancellationToken
+                    tlsTimeoutCts.Token
                 )
                 .ConfigureAwait(false);
 
@@ -614,7 +650,7 @@ public sealed class FileTransferService : IFileTransferService
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            timeoutCts.CancelAfter(s_transferRequestTimeout);
+            timeoutCts.CancelAfter(this.m_options.TransferRequestTimeout);
 
             TransferResponse userResponse;
             try
@@ -669,7 +705,7 @@ public sealed class FileTransferService : IFileTransferService
                 FileMode.Create,
                 FileAccess.Write,
                 FileShare.None,
-                bufferSize: DefaultBufferSize,
+                bufferSize: this.m_options.BufferSize,
                 useAsync: true
             );
 

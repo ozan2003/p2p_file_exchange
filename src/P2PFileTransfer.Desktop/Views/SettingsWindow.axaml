@@ -1,0 +1,169 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:P2PFileTransfer.Desktop.ViewModels"
+        x:Class="P2PFileTransfer.Desktop.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="Settings"
+        Width="720"
+        Height="640"
+        MinWidth="640"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner">
+    <DockPanel>
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,8">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding StatusMessage}"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           IsVisible="{Binding StatusMessage.Length}" />
+                <Button Grid.Column="1"
+                        Content="Cancel"
+                        MinWidth="80"
+                        IsCancel="True"
+                        Command="{Binding CancelCommand}" />
+                <Button Grid.Column="2"
+                        Content="Save"
+                        MinWidth="80"
+                        Classes="accent"
+                        IsDefault="True"
+                        Command="{Binding SaveCommand}" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12" Spacing="16">
+                <TextBlock Text="Discovery"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Broadcast port"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding BroadcastPortText, Mode=TwoWay}"
+                             Watermark="37020" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Broadcast address"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
+                             Text="{Binding BroadcastAddressText, Mode=TwoWay}"
+                             Watermark="255.255.255.255" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="Broadcast interval (seconds)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding BroadcastIntervalSecondsText, Mode=TwoWay}"
+                             Watermark="5" />
+
+                    <TextBlock Grid.Row="3"
+                               Text="Peer timeout (seconds)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="3"
+                             Grid.Column="1"
+                             Text="{Binding PeerTimeoutSecondsText, Mode=TwoWay}"
+                             Watermark="15" />
+
+                    <TextBlock Grid.Row="4"
+                               Text="Cleanup interval (seconds)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="4"
+                             Grid.Column="1"
+                             Text="{Binding CleanupIntervalSecondsText, Mode=TwoWay}"
+                             Watermark="5" />
+                </Grid>
+
+                <TextBlock Text="Transfer"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Chunk size (KiB)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding ChunkSizeKiBText, Mode=TwoWay}"
+                             Watermark="256" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Buffer size (KiB)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
+                             Text="{Binding BufferSizeKiBText, Mode=TwoWay}"
+                             Watermark="80" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="TLS handshake timeout (seconds)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding TlsHandshakeTimeoutSecondsText, Mode=TwoWay}"
+                             Watermark="10" />
+
+                    <TextBlock Grid.Row="3"
+                               Text="Transfer request timeout (seconds)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="3"
+                             Grid.Column="1"
+                             Text="{Binding TransferRequestTimeoutSecondsText, Mode=TwoWay}"
+                             Watermark="120" />
+                </Grid>
+
+                <TextBlock Text="Download"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Download directory"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding DownloadDirectory, Mode=TwoWay}" />
+                </Grid>
+
+                <TextBlock Text="Security"
+                           FontWeight="SemiBold"
+                           FontSize="14" />
+                <Grid ColumnDefinitions="220,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                    <TextBlock Grid.Row="0"
+                               Text="Certificate path"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="0"
+                             Grid.Column="1"
+                             Text="{Binding CertificatePath, Mode=TwoWay}" />
+
+                    <TextBlock Grid.Row="1"
+                               Text="Certificate validity (years)"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="1"
+                             Grid.Column="1"
+                             Text="{Binding CertificateValidityYearsText, Mode=TwoWay}"
+                             Watermark="10" />
+
+                    <TextBlock Grid.Row="2"
+                               Text="Signing key path"
+                               VerticalAlignment="Center" />
+                    <TextBox Grid.Row="2"
+                             Grid.Column="1"
+                             Text="{Binding SigningKeyPath, Mode=TwoWay}" />
+                </Grid>
+
+                <TextBlock Text="Note: Discovery and security changes apply after restarting discovery or the app."
+                           TextWrapping="Wrap"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

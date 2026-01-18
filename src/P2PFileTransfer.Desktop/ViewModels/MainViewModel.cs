@@ -16,6 +16,7 @@ using P2PFileTransfer.Core.Services.Security;
 using P2PFileTransfer.Core.Services.Transfer;
 using P2PFileTransfer.Core.Utilities;
 using P2PFileTransfer.Desktop.Services;
+using P2PFileTransfer.Desktop.Settings;
 using ReactiveUI;
 
 namespace P2PFileTransfer.Desktop.ViewModels;
@@ -33,6 +34,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IFileDialogService m_fileDialogService;
     private readonly CertificateManager m_certificateManager;
     private readonly SigningKeyManager m_signingKeyManager;
+    private readonly AppSettings m_settings;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
     [];
@@ -57,7 +59,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     public MainViewModel(
         IPeerDiscoveryService peerDiscoveryService,
         IFileTransferService fileTransferService,
-        IFileDialogService fileDialogService
+        IFileDialogService fileDialogService,
+        AppSettings settings
     )
     {
         this.m_peerDiscoveryService = peerDiscoveryService;
@@ -65,6 +68,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_fileDialogService = fileDialogService;
         this.m_certificateManager = new CertificateManager();
         this.m_signingKeyManager = new SigningKeyManager();
+        this.m_settings = settings;
 
         this.m_displayName = GetDefaultDisplayName();
 
@@ -217,9 +221,12 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         try
         {
             // Initialize the TLS certificate for file transfers.
+            SecuritySettings securitySettings = this.m_settings.Security;
             this.m_localCertificate =
-                this.m_certificateManager.GetOrCreateDefaultCertificate(
-                    DefaultCertificatePassword
+                this.m_certificateManager.GetOrCreateCertificate(
+                    securitySettings.CertificatePath,
+                    DefaultCertificatePassword,
+                    securitySettings.CertificateValidityYears
                 );
             this.m_localFingerprint =
                 this.m_certificateManager.GetCertificateFingerprint(
@@ -227,11 +234,16 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 );
 
             // Load or create the ECDSA signing key for discovery authentication.
-            this.m_signingKey =
-                this.m_signingKeyManager.GetOrCreateDefaultKeyPair();
+            this.m_signingKey = this.m_signingKeyManager.GetOrCreateKeyPair(
+                securitySettings.SigningKeyPath
+            );
 
-            string downloadDirectory =
-                FilePathUtilities.GetDefaultDownloadDirectory();
+            string downloadDirectory = this.m_settings.DownloadDirectory;
+            if (string.IsNullOrWhiteSpace(downloadDirectory))
+            {
+                downloadDirectory =
+                    FilePathUtilities.GetDefaultDownloadDirectory();
+            }
             await ((FileTransferService)this.m_fileTransferService)
                 .StartListenerAsync(
                     0, // dynamic port

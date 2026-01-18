@@ -11,7 +11,11 @@ namespace P2PFileTransfer.Core.Services.Security;
 public sealed class CertificateManager
 {
     private const int RsaKeySize = 2048;
-    private const int DefaultValidityYears = 10;
+
+    /// <summary>
+    /// The default validity duration in years for generated certificates.
+    /// </summary>
+    public const int DefaultValidityYears = 10;
     private const string DefaultCertificateDirectoryName = "P2PFileTransfer";
     private const string DefaultCertificateFileName = "peer.pfx";
 
@@ -32,6 +36,23 @@ public sealed class CertificateManager
     /// </summary>
     public X509Certificate2 GenerateSelfSignedCertificate()
     {
+        return this.GenerateSelfSignedCertificate(DefaultValidityYears);
+    }
+
+    /// <summary>
+    /// Generates a self-signed certificate with an exportable private key.
+    /// </summary>
+    /// <param name="validityYears">The certificate validity duration in years.</param>
+    public X509Certificate2 GenerateSelfSignedCertificate(int validityYears)
+    {
+        if (validityYears <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(validityYears),
+                "Validity years must be positive."
+            );
+        }
+
         string commonName = ResolveCommonName();
         using RSA rsa = RSA.Create();
         rsa.KeySize = RsaKeySize;
@@ -60,7 +81,7 @@ public sealed class CertificateManager
         );
 
         DateTimeOffset notBefore = DateTimeOffset.UtcNow;
-        DateTimeOffset notAfter = notBefore.AddYears(DefaultValidityYears);
+        DateTimeOffset notAfter = notBefore.AddYears(validityYears);
 
         using X509Certificate2 certificate =
             certificateRequest.CreateSelfSigned(notBefore, notAfter);
@@ -137,14 +158,35 @@ public sealed class CertificateManager
     /// <param name="password">The PFX password.</param>
     public X509Certificate2 GetOrCreateDefaultCertificate(string password)
     {
-        string certificatePath = DefaultCertificatePath;
-        if (File.Exists(certificatePath))
+        return this.GetOrCreateCertificate(
+            DefaultCertificatePath,
+            password,
+            DefaultValidityYears
+        );
+    }
+
+    /// <summary>
+    /// Loads an existing certificate or generates and saves a new one if missing.
+    /// </summary>
+    /// <param name="filePath">The PFX file path.</param>
+    /// <param name="password">The PFX password.</param>
+    /// <param name="validityYears">The certificate validity duration in years.</param>
+    public X509Certificate2 GetOrCreateCertificate(
+        string filePath,
+        string password,
+        int validityYears
+    )
+    {
+        EnsureFilePath(filePath);
+        if (File.Exists(filePath))
         {
-            return this.LoadCertificate(certificatePath, password);
+            return this.LoadCertificate(filePath, password);
         }
 
-        X509Certificate2 certificate = this.GenerateSelfSignedCertificate();
-        this.SaveCertificate(certificate, certificatePath, password);
+        X509Certificate2 certificate = this.GenerateSelfSignedCertificate(
+            validityYears
+        );
+        this.SaveCertificate(certificate, filePath, password);
         return certificate;
     }
 
