@@ -4,6 +4,10 @@ Peer-to-peer file transfer app for local networks. It discovers peers via UDP
 broadcast and sends files over TCP with per-chunk integrity checks,
 all accessible through a cross-platform desktop UI built with Avalonia.
 
+> [!WARNING]
+> This app is not audited for security. Do not use it to transfer sensitive files
+> over untrusted networks.
+
 ## Features
 
 - Automatic peer discovery on the local network
