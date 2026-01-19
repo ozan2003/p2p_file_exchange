@@ -405,6 +405,7 @@ public sealed class FileTransferService : IFileTransferService
             );
             await foreach (FileChunk chunk in chunks)
             {
+                // Send each chunk to the peer.
                 await FileTransferProtocol
                     .WriteChunkAsync(sslStream, chunk, cancellationToken)
                     .ConfigureAwait(false);
