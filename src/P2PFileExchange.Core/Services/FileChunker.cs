@@ -49,10 +49,10 @@ internal static class FileChunker
         [EnumeratorCancellation] CancellationToken cancellationToken
     )
     {
-        if (chunkSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(chunkSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(
+            chunkSize,
+            nameof(chunkSize)
+        );
 
         // Rent a buffer from the shared pool to reduce allocations.
         byte[] buffer = ArrayPool<byte>.Shared.Rent(chunkSize);
