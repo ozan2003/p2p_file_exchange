@@ -32,7 +32,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
-    private readonly CertificateManager m_certificateManager;
     private readonly SigningKeyManager m_signingKeyManager;
     private readonly AppSettings m_settings;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
@@ -44,10 +43,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private ECDsa? m_signingKey;
 
     private string m_displayName;
-    private string m_statusMessage = "Ready.";
-    private bool m_isDiscovering;
-    private bool m_isBusy;
-    private PeerItemViewModel? m_selectedPeer;
     private bool m_isDisposed;
 
     /// <summary>
@@ -66,7 +61,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService = peerDiscoveryService;
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
-        this.m_certificateManager = new CertificateManager();
         this.m_signingKeyManager = new SigningKeyManager();
         this.m_settings = settings;
 
@@ -171,9 +165,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public bool IsDiscovering
     {
-        get => this.m_isDiscovering;
-        private set =>
-            this.RaiseAndSetIfChanged(ref this.m_isDiscovering, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -181,8 +174,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public bool IsBusy
     {
-        get => this.m_isBusy;
-        private set => this.RaiseAndSetIfChanged(ref this.m_isBusy, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -190,8 +183,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public PeerItemViewModel? SelectedPeer
     {
-        get => this.m_selectedPeer;
-        set => this.RaiseAndSetIfChanged(ref this.m_selectedPeer, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -199,10 +192,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// </summary>
     public string StatusMessage
     {
-        get => this.m_statusMessage;
-        private set =>
-            this.RaiseAndSetIfChanged(ref this.m_statusMessage, value);
-    }
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = "Ready.";
 
     /// <summary>
     /// The discovered peers.
@@ -238,14 +230,13 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         {
             // Initialize the TLS certificate for file transfers.
             SecuritySettings securitySettings = this.m_settings.Security;
-            this.m_localCertificate =
-                this.m_certificateManager.GetOrCreateCertificate(
-                    securitySettings.CertificatePath,
-                    DefaultCertificatePassword,
-                    securitySettings.CertificateValidityYears
-                );
+            this.m_localCertificate = CertificateManager.GetOrCreateCertificate(
+                securitySettings.CertificatePath,
+                DefaultCertificatePassword,
+                securitySettings.CertificateValidityYears
+            );
             this.m_localFingerprint =
-                this.m_certificateManager.GetCertificateFingerprint(
+                CertificateManager.GetCertificateFingerprint(
                     this.m_localCertificate
                 );
 

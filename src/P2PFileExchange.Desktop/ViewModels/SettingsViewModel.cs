@@ -25,19 +25,6 @@ public sealed class SettingsViewModel : ReactiveObject
     private readonly IFileTransferService m_fileTransferService;
     private readonly IWindowProvider m_windowProvider;
 
-    private decimal m_broadcastIntervalSeconds;
-    private decimal m_peerTimeoutSeconds;
-    private decimal m_cleanupIntervalSeconds;
-    private decimal m_chunkSizeKiB;
-    private decimal m_bufferSizeKiB;
-    private decimal m_tlsHandshakeTimeoutSeconds;
-    private decimal m_transferRequestTimeoutSeconds;
-    private string m_downloadDirectory = string.Empty;
-    private string m_certificatePath = string.Empty;
-    private decimal m_certificateValidityYears;
-    private string m_signingKeyPath = string.Empty;
-    private string m_statusMessage = string.Empty;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsViewModel"/> class.
     /// </summary>
@@ -87,13 +74,10 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal BroadcastIntervalSeconds
     {
-        get => this.m_broadcastIntervalSeconds;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(
-                ref this.m_broadcastIntervalSeconds,
-                value
-            );
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(this.HasPeerTimeoutWarning));
         }
     }
@@ -103,10 +87,10 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal PeerTimeoutSeconds
     {
-        get => this.m_peerTimeoutSeconds;
+        get;
         set
         {
-            this.RaiseAndSetIfChanged(ref this.m_peerTimeoutSeconds, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(this.HasPeerTimeoutWarning));
         }
     }
@@ -116,9 +100,8 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal CleanupIntervalSeconds
     {
-        get => this.m_cleanupIntervalSeconds;
-        set =>
-            this.RaiseAndSetIfChanged(ref this.m_cleanupIntervalSeconds, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -126,8 +109,8 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal ChunkSizeKiB
     {
-        get => this.m_chunkSizeKiB;
-        set => this.RaiseAndSetIfChanged(ref this.m_chunkSizeKiB, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -135,8 +118,8 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal BufferSizeKiB
     {
-        get => this.m_bufferSizeKiB;
-        set => this.RaiseAndSetIfChanged(ref this.m_bufferSizeKiB, value);
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -144,12 +127,8 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal TlsHandshakeTimeoutSeconds
     {
-        get => this.m_tlsHandshakeTimeoutSeconds;
-        set =>
-            this.RaiseAndSetIfChanged(
-                ref this.m_tlsHandshakeTimeoutSeconds,
-                value
-            );
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -157,12 +136,8 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public decimal TransferRequestTimeoutSeconds
     {
-        get => this.m_transferRequestTimeoutSeconds;
-        set =>
-            this.RaiseAndSetIfChanged(
-                ref this.m_transferRequestTimeoutSeconds,
-                value
-            );
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -170,30 +145,26 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public string DownloadDirectory
     {
-        get => this.m_downloadDirectory;
-        set => this.RaiseAndSetIfChanged(ref this.m_downloadDirectory, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     /// <summary>
     /// The certificate path.
     /// </summary>
     public string CertificatePath
     {
-        get => this.m_certificatePath;
-        set => this.RaiseAndSetIfChanged(ref this.m_certificatePath, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     /// <summary>
     /// The certificate validity in years.
     /// </summary>
     public decimal CertificateValidityYears
     {
-        get => this.m_certificateValidityYears;
-        set =>
-            this.RaiseAndSetIfChanged(
-                ref this.m_certificateValidityYears,
-                value
-            );
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -201,18 +172,18 @@ public sealed class SettingsViewModel : ReactiveObject
     /// </summary>
     public string SigningKeyPath
     {
-        get => this.m_signingKeyPath;
-        set => this.RaiseAndSetIfChanged(ref this.m_signingKeyPath, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     /// <summary>
     /// The status message for validation and save feedback.
     /// </summary>
     public string StatusMessage
     {
-        get => this.m_statusMessage;
-        set => this.RaiseAndSetIfChanged(ref this.m_statusMessage, value);
-    }
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
 
     /// <summary>
     /// Gets a value indicating whether the peer timeout is less than or equal to the broadcast interval,

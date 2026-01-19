@@ -15,7 +15,6 @@ public sealed class SettingsStore
     private const string SettingsDirectoryName =
         AppConstants.AppDataDirectoryName;
     private const string SettingsFileName = "settings.json";
-    private readonly string m_settingsPath;
     private readonly JsonSerializerOptions m_jsonOptions;
 
     /// <summary>
@@ -26,11 +25,11 @@ public sealed class SettingsStore
     {
         if (string.IsNullOrWhiteSpace(settingsPath))
         {
-            this.m_settingsPath = GetDefaultSettingsPath();
+            this.SettingsPath = GetDefaultSettingsPath();
         }
         else
         {
-            this.m_settingsPath = Path.GetFullPath(settingsPath);
+            this.SettingsPath = Path.GetFullPath(settingsPath);
         }
         this.m_jsonOptions = CreateJsonOptions();
     }
@@ -38,7 +37,7 @@ public sealed class SettingsStore
     /// <summary>
     /// Gets the settings file path.
     /// </summary>
-    public string SettingsPath => this.m_settingsPath;
+    public string SettingsPath { get; }
 
     /// <summary>
     /// Loads persisted settings or returns defaults when unavailable.
@@ -47,12 +46,12 @@ public sealed class SettingsStore
     {
         try
         {
-            if (!File.Exists(this.m_settingsPath))
+            if (!File.Exists(this.SettingsPath))
             {
                 return CreateDefaultSettings();
             }
 
-            using FileStream stream = File.OpenRead(this.m_settingsPath);
+            using FileStream stream = File.OpenRead(this.SettingsPath);
             AppSettings? settings = JsonSerializer.Deserialize<AppSettings>(
                 stream,
                 this.m_jsonOptions
@@ -85,16 +84,16 @@ public sealed class SettingsStore
         settings.Normalize();
 
         string directory =
-            Path.GetDirectoryName(this.m_settingsPath) ?? string.Empty;
+            Path.GetDirectoryName(this.SettingsPath) ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
-        string tempPath = $"{this.m_settingsPath}.tmp";
+        string tempPath = $"{this.SettingsPath}.tmp";
         string json = JsonSerializer.Serialize(settings, this.m_jsonOptions);
         File.WriteAllText(tempPath, json);
-        File.Move(tempPath, this.m_settingsPath, overwrite: true);
+        File.Move(tempPath, this.SettingsPath, overwrite: true);
     }
 
     /// <summary>

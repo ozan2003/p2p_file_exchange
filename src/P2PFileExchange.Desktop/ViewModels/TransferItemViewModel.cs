@@ -25,13 +25,9 @@ public sealed class TransferItemViewModel : ReactiveObject
     private readonly long m_totalBytes;
 
     private DateTimeOffset? m_startedAt;
-    private int m_progressPercent;
-    private long m_bytesTransferred;
     private string m_statusText;
     private string m_speedText;
     private string m_etaText;
-    private bool m_isFinished;
-    private bool m_isSuccess;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="TransferItemViewModel"/> class.
@@ -110,9 +106,8 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// </summary>
     public int ProgressPercent
     {
-        get => this.m_progressPercent;
-        private set =>
-            this.RaiseAndSetIfChanged(ref this.m_progressPercent, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -120,10 +115,10 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// </summary>
     public long BytesTransferred
     {
-        get => this.m_bytesTransferred;
+        get;
         private set
         {
-            this.RaiseAndSetIfChanged(ref this.m_bytesTransferred, value);
+            this.RaiseAndSetIfChanged(ref field, value);
             this.RaisePropertyChanged(nameof(this.ProgressText));
         }
     }
@@ -166,8 +161,8 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// </summary>
     public bool IsFinished
     {
-        get => this.m_isFinished;
-        private set => this.RaiseAndSetIfChanged(ref this.m_isFinished, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>
@@ -175,8 +170,8 @@ public sealed class TransferItemViewModel : ReactiveObject
     /// </summary>
     public bool IsSuccess
     {
-        get => this.m_isSuccess;
-        private set => this.RaiseAndSetIfChanged(ref this.m_isSuccess, value);
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
     }
 
     /// <summary>

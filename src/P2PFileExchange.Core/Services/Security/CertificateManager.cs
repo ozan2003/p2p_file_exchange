@@ -43,16 +43,18 @@ public sealed class CertificateManager
     /// <summary>
     /// Generates a self-signed certificate with an exportable private key.
     /// </summary>
-    public X509Certificate2 GenerateSelfSignedCertificate()
+    public static X509Certificate2 GenerateSelfSignedCertificate()
     {
-        return this.GenerateSelfSignedCertificate(DefaultValidityYears);
+        return GenerateSelfSignedCertificate(DefaultValidityYears);
     }
 
     /// <summary>
     /// Generates a self-signed certificate with an exportable private key.
     /// </summary>
     /// <param name="validityYears">The certificate validity duration in years.</param>
-    public X509Certificate2 GenerateSelfSignedCertificate(int validityYears)
+    public static X509Certificate2 GenerateSelfSignedCertificate(
+        int validityYears
+    )
     {
         if (validityYears <= 0)
         {
@@ -104,7 +106,7 @@ public sealed class CertificateManager
     /// <param name="certificate">The certificate to save.</param>
     /// <param name="filePath">The target file path.</param>
     /// <param name="password">The PFX password.</param>
-    public void SaveCertificate(
+    public static void SaveCertificate(
         X509Certificate2 certificate,
         string filePath,
         string password
@@ -129,7 +131,10 @@ public sealed class CertificateManager
     /// </summary>
     /// <param name="filePath">The PFX file path.</param>
     /// <param name="password">The PFX password.</param>
-    public X509Certificate2 LoadCertificate(string filePath, string password)
+    public static X509Certificate2 LoadCertificate(
+        string filePath,
+        string password
+    )
     {
         EnsureFilePath(filePath);
 
@@ -153,7 +158,7 @@ public sealed class CertificateManager
     /// Computes the SHA-256 fingerprint of a certificate.
     /// </summary>
     /// <param name="certificate">The certificate to hash.</param>
-    public string GetCertificateFingerprint(X509Certificate2 certificate)
+    public static string GetCertificateFingerprint(X509Certificate2 certificate)
     {
         ArgumentNullException.ThrowIfNull(certificate, nameof(certificate));
 
@@ -165,9 +170,11 @@ public sealed class CertificateManager
     /// Loads the default certificate or generates and saves one if missing.
     /// </summary>
     /// <param name="password">The PFX password.</param>
-    public X509Certificate2 GetOrCreateDefaultCertificate(string password)
+    public static X509Certificate2 GetOrCreateDefaultCertificate(
+        string password
+    )
     {
-        return this.GetOrCreateCertificate(
+        return GetOrCreateCertificate(
             DefaultCertificatePath,
             password,
             DefaultValidityYears
@@ -180,7 +187,7 @@ public sealed class CertificateManager
     /// <param name="filePath">The PFX file path.</param>
     /// <param name="password">The PFX password.</param>
     /// <param name="validityYears">The certificate validity duration in years.</param>
-    public X509Certificate2 GetOrCreateCertificate(
+    public static X509Certificate2 GetOrCreateCertificate(
         string filePath,
         string password,
         int validityYears
@@ -189,13 +196,13 @@ public sealed class CertificateManager
         EnsureFilePath(filePath);
         if (File.Exists(filePath))
         {
-            return this.LoadCertificate(filePath, password);
+            return LoadCertificate(filePath, password);
         }
 
-        X509Certificate2 certificate = this.GenerateSelfSignedCertificate(
+        X509Certificate2 certificate = GenerateSelfSignedCertificate(
             validityYears
         );
-        this.SaveCertificate(certificate, filePath, password);
+        SaveCertificate(certificate, filePath, password);
         return certificate;
     }
 
