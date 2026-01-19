@@ -20,10 +20,16 @@ namespace P2PFileExchange.Core.Services.Security;
 /// </summary>
 public sealed class SigningKeyManager
 {
+    #region Constants
+    /// <summary>Default app data directory name for signing keys.</summary>
     private const string DefaultSigningKeyDirectoryName =
         AppConstants.AppDataDirectoryName;
-    private const string DefaultSigningKeyFileName = "signing.key";
 
+    /// <summary>Default file name for signing key storage.</summary>
+    private const string DefaultSigningKeyFileName = "signing.key";
+    #endregion Constants
+
+    #region Paths
     /// <summary>
     /// Gets the default signing key path in the application data directory.
     /// </summary>
@@ -35,6 +41,7 @@ public sealed class SigningKeyManager
             DefaultSigningKeyDirectoryName,
             DefaultSigningKeyFileName
         );
+    #endregion Paths
 
     /// <summary>
     /// Generates a new ECDSA P-256 keypair.

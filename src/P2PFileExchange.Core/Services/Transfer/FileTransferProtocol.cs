@@ -54,6 +54,7 @@ namespace P2PFileExchange.Core.Services.Transfer;
 /// </remarks>
 internal static class FileTransferProtocol
 {
+    /// <summary>JSON serialization settings for wire payloads.</summary>
     private static readonly JsonSerializerOptions s_jsonOptions = new(
         JsonSerializerDefaults.Web
     );

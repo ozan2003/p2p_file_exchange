@@ -11,16 +11,22 @@ namespace P2PFileExchange.Core.Services.Security;
 /// </summary>
 public sealed class CertificateManager
 {
+    #region Constants
+    /// <summary>RSA key size used for self-signed certificates.</summary>
     private const int RsaKeySize = 2048;
 
-    /// <summary>
-    /// The default validity duration in years for generated certificates.
-    /// </summary>
+    /// <summary>The default validity duration in years for generated certificates.</summary>
     public const int DefaultValidityYears = 10;
+
+    /// <summary>Default app data directory name for certificates.</summary>
     private const string DefaultCertificateDirectoryName =
         AppConstants.AppDataDirectoryName;
-    private const string DefaultCertificateFileName = "peer.pfx";
 
+    /// <summary>Default file name for certificate storage.</summary>
+    private const string DefaultCertificateFileName = "peer.pfx";
+    #endregion Constants
+
+    #region Paths
     /// <summary>
     /// Gets the default certificate path in the application data directory.
     /// </summary>
@@ -32,6 +38,7 @@ public sealed class CertificateManager
             DefaultCertificateDirectoryName,
             DefaultCertificateFileName
         );
+    #endregion Paths
 
     /// <summary>
     /// Generates a self-signed certificate with an exportable private key.

@@ -21,32 +21,48 @@ namespace P2PFileExchange.Core.Services.Transfer;
 /// </summary>
 public sealed class FileTransferService : IFileTransferService
 {
+    #region Configuration
+    /// <summary>Transfer configuration options.</summary>
     private readonly FileTransferOptions m_options;
+    #endregion Configuration
 
-    /// <summary>
-    /// Lock for TCP listener.
-    /// </summary>
+    #region Synchronization
+    /// <summary>Lock for TCP listener.</summary>
     private readonly SemaphoreSlim m_listenerLock = new(1, 1);
+    #endregion Synchronization
 
-    /// <summary>
-    /// Pending transfer requests awaiting user response.
-    /// Maps requestId to a TaskCompletionSource that will be completed with the response.
-    /// </summary>
+    #region Pending Requests
+    /// <summary>Pending transfer requests awaiting user response.</summary>
     private readonly ConcurrentDictionary<
         Guid,
         TaskCompletionSource<TransferResponse>
     > m_pendingRequests = new();
+    #endregion Pending Requests
 
-    /// <summary>
-    /// The TCP listener for file transfers.
-    /// </summary>
+    #region Listener State
+    /// <summary>The TCP listener for file transfers.</summary>
     private TcpListener? m_listener;
+
+    /// <summary>Cancellation source for listener loop.</summary>
     private CancellationTokenSource? m_listenerCts;
+
+    /// <summary>Task running the accept loop.</summary>
     private Task? m_acceptLoopTask;
+    #endregion Listener State
+
+    #region Transfer Settings
+    /// <summary>Download directory for inbound files.</summary>
     private string m_downloadDirectory = string.Empty;
+
+    /// <summary>Local TLS certificate.</summary>
     private X509Certificate2? m_certificate;
+
+    /// <summary>Lookup for expected peer certificate fingerprints.</summary>
     private Func<IPAddress, string?>? m_fingerprintLookup;
+
+    /// <summary>Lookup for peer display names.</summary>
     private Func<IPAddress, string?>? m_displayNameLookup;
+    #endregion Transfer Settings
 
     /// <summary>
     /// Initializes a new instance of the <see cref="FileTransferService"/> class.
