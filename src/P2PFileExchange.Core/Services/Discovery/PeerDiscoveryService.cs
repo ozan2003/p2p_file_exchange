@@ -20,34 +20,100 @@ namespace P2PFileExchange.Core.Services.Discovery;
 /// </summary>
 public sealed class PeerDiscoveryService : IPeerDiscoveryService
 {
+    #region Constants
     /// <summary>
     /// The deduplication window. If a same peer sends an announcement within this window, it will be ignored.
     /// </summary>
     private static readonly TimeSpan s_deduplicationWindow =
         TimeSpan.FromSeconds(10);
+    #endregion Constants
 
-    private readonly ConcurrentDictionary<Guid, PeerInfo> m_peers = new();
-    private readonly ConcurrentDictionary<Guid, string> m_verifiedPublicKeys =
-        new();
-    private readonly ConcurrentDictionary<
-        Guid,
-        DateTimeOffset
-    > m_lastSeenTimestamps = new();
+    #region Configuration
+    /// <summary>
+    /// Settings for the peer discovery service.
+    /// </summary>
     private readonly PeerDiscoveryOptions m_options;
+
+    /// <summary>
+    /// JSON serialization settings.
+    /// </summary>
     private readonly JsonSerializerOptions m_jsonOptions;
+    #endregion Configuration
+
+    #region Peer State
+    /// <summary>
+    /// Collection of discovered peers by their ID.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, PeerInfo> m_peers = new();
+    #endregion Peer State
+
+    #region Synchronization
+    /// <summary>
+    /// Semaphore to protect start/stop operations.
+    /// </summary>
     private readonly SemaphoreSlim m_stateLock = new(1, 1);
 
+    /// <summary>
+    /// Cancellation token source for discovery operations.
+    /// </summary>
     private CancellationTokenSource? m_discoveryCts;
+    #endregion Synchronization
+
+    #region Networking
+    /// <summary>
+    /// UDP client for broadcasting announcements.
+    /// </summary>
     private UdpClient? m_broadcastClient;
+
+    /// <summary>
+    /// UDP client for listening to announcements.
+    /// </summary>
     private UdpClient? m_listenClient;
+    #endregion Networking
+
+    #region Background Tasks
+    /// <summary>
+    /// Task for broadcasting announcements.
+    /// </summary>
     private Task? m_broadcastTask;
+
+    /// <summary>
+    /// Task for listening to announcements.
+    /// </summary>
     private Task? m_listenTask;
+
+    /// <summary>
+    /// Task for cleaning up stale peers.
+    /// </summary>
     private Task? m_cleanupTask;
+    #endregion Background Tasks
+
+    #region Local Identity
+    /// <summary>
+    /// The local peer's display name.
+    /// </summary>
     private string m_displayName = string.Empty;
+
+    /// <summary>
+    /// The local peer's certificate fingerprint.
+    /// </summary>
     private string m_certificateFingerprint = string.Empty;
+
+    /// <summary>
+    /// The local peer's TCP port for incoming connections.
+    /// </summary>
     private ushort m_tcpPort;
+
+    /// <summary>
+    /// The local peer's ECDSA signing key.
+    /// </summary>
     private ECDsa? m_signingKey;
+
+    /// <summary>
+    /// The local peer's public key in Base64 format.
+    /// </summary>
     private string m_localPublicKey = string.Empty;
+    #endregion Local Identity
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PeerDiscoveryService"/> class.
@@ -474,9 +540,21 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 DateTimeOffset now = DateTimeOffset.UtcNow;
 
                 // Cheap dedup check to avoid processing the same peer's announcement multiple times.
-                if (this.IsDuplicateAnnouncement(announcement.PeerId, now))
+                // Still update LastSeen to prevent premature cleanup.
+                if (
+                    this.m_peers.TryGetValue(
+                        announcement.PeerId,
+                        out PeerInfo? existingPeer
+                    )
+                )
                 {
-                    continue;
+                    bool isDuplicate =
+                        now - existingPeer.LastSeen < s_deduplicationWindow;
+                    existingPeer.LastSeen = now;
+                    if (isDuplicate)
+                    {
+                        continue;
+                    }
                 }
 
                 IPAddress ipAddress = announcement.IPAddress;
@@ -484,13 +562,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 {
                     ipAddress = received.RemoteEndPoint.Address;
                 }
-
-                // Store the verified public key for this peer.
-                this.m_verifiedPublicKeys.AddOrUpdate(
-                    announcement.PeerId,
-                    announcement.PublicKey,
-                    (_, _) => announcement.PublicKey
-                );
 
                 // Peers info is updated here.
                 PeerInfo peerInfo = this.m_peers.AddOrUpdate(
@@ -517,7 +588,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         );
                         existing.IPAddress = ipAddress;
                         existing.TcpPort = announcement.TcpPort;
-                        existing.LastSeen = now;
+                        // LastSeen is updated above in the dedup check.
                         existing.CertificateFingerprint =
                             announcement.CertificateFingerprint ?? string.Empty;
                         existing.PublicKey =
@@ -549,38 +620,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 // Ignore malformed payloads.
             }
         }
-    }
-
-    /// <summary>
-    /// Checks if an announcement from a peer should be considered a duplicate.
-    ///
-    /// <list type="bullet">
-    /// <item> If the announcement of the same peer is received within <see cref="s_deduplicationWindow"/>, it will be considered a duplicate.</item>
-    /// <item> Otherwise, the last-seen timestamp will be updated to the current timestamp.</item>
-    /// </list>
-    /// </summary>
-    /// <param name="peerId">The peer identifier.</param>
-    /// <param name="now">The current timestamp.</param>
-    /// <returns>True if the announcement is a duplicate within the deduplication window.</returns>
-    private bool IsDuplicateAnnouncement(Guid peerId, DateTimeOffset now)
-    {
-        DateTimeOffset lastSeen = this.m_lastSeenTimestamps.AddOrUpdate(
-            peerId,
-            now,
-            (_, existing) =>
-            {
-                // If within the deduplication window, keep the old timestamp.
-                if (now - existing < s_deduplicationWindow)
-                {
-                    return existing;
-                }
-
-                // Otherwise, update to the new timestamp.
-                return now;
-            }
-        );
-
-        return lastSeen != now;
     }
 
     /// <summary>
