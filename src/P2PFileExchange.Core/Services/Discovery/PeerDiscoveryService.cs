@@ -17,6 +17,14 @@ namespace P2PFileExchange.Core.Services.Discovery;
 
 /// <summary>
 /// Handles UDP broadcast discovery of peers on the local network.
+///
+/// <list type="bullet">
+/// <item>Broadcasts signed peer announcements over UDP at a configured interval.</item>
+/// <item>Listens for announcements, validates fingerprints, and verifies ECDSA signatures.</item>
+/// <item>Ignores self-announcements, deduplicates within a time window, and updates the peer registry.</item>
+/// <item>Raises events when peers are added/updated/removed and when status changes.</item>
+/// <item>Periodically cleans up stale peers based on the configured timeout.</item>
+/// </list>
 /// </summary>
 public sealed class PeerDiscoveryService : IPeerDiscoveryService
 {

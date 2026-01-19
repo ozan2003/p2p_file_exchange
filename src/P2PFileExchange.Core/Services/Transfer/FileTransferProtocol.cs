@@ -12,6 +12,14 @@ namespace P2PFileExchange.Core.Services.Transfer;
 /// <summary>
 /// Implements the wire protocol for metadata and chunk payloads.
 /// Not to be confused with the actual File Transfer Protocol (FTP).
+///
+/// <list type="bullet">
+/// <item>Encodes all integer fields as little-endian 32-bit signed values.</item>
+/// <item>Writes metadata as a length-prefixed JSON payload.</item>
+/// <item>Writes chunks as index + data length + hash length + data + hash.</item>
+/// <item>Defines a 1-byte transfer response for accept/reject decisions.</item>
+/// <item>Performs exact-length reads and throws on malformed or truncated frames.</item>
+/// </list>
 /// </summary>
 /// <remarks>
 /// <para><b>Wire Protocol</b></para>

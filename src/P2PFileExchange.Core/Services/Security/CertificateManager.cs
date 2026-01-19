@@ -8,6 +8,13 @@ namespace P2PFileExchange.Core.Services.Security;
 
 /// <summary>
 /// Manages X509 certificate generation, persistence, and fingerprinting.
+///
+/// <list type="bullet">
+/// <item>Generates self-signed RSA certificates with exportable private keys.</item>
+/// <item>Saves and loads PFX files to the application data directory.</item>
+/// <item>Computes SHA-256 hex fingerprints for certificate pinning.</item>
+/// <item>Provides get-or-create helpers for default or custom certificate paths.</item>
+/// </list>
 /// </summary>
 public sealed class CertificateManager
 {

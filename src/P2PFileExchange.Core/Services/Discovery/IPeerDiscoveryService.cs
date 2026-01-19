@@ -10,6 +10,13 @@ namespace P2PFileExchange.Core.Services.Discovery;
 
 /// <summary>
 /// Describes peer discovery operations over UDP broadcast on the same LAN.
+///
+/// <list type="bullet">
+/// <item>Manages the discovery lifecycle (start/stop) and exposes running state.</item>
+/// <item>Emits peer update/removal events and status messages for UI consumption.</item>
+/// <item>Provides access to the local peer ID, broadcast port, and discovered peers.</item>
+/// <item>Supplies certificate fingerprints used by the transfer layer for pinning.</item>
+/// </list>
 /// </summary>
 public interface IPeerDiscoveryService : IAsyncDisposable
 {

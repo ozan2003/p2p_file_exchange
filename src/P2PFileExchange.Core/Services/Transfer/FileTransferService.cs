@@ -18,6 +18,14 @@ namespace P2PFileExchange.Core.Services.Transfer;
 
 /// <summary>
 /// Provides TCP-based file transfer functionality.
+///
+/// <list type="bullet">
+/// <item>Hosts a TCP listener and negotiates TLS with a local certificate.</item>
+/// <item>Sends files by connecting to a peer, performing TLS, sending metadata, then streaming chunks.</item>
+/// <item>Receives files by authenticating TLS, awaiting user approval, then writing chunks to disk.</item>
+/// <item>Validates chunk order and SHA-256 hashes, sanitizes file names, and cleans up partial files on failure.</item>
+/// <item>Supports certificate pinning via fingerprint lookups from peer discovery.</item>
+/// </list>
 /// </summary>
 public sealed class FileTransferService : IFileTransferService
 {

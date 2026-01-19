@@ -11,11 +11,11 @@ namespace P2PFileExchange.Core.Services.Security;
 /// for discovery broadcast authentication.
 ///
 /// <list type="bullet">
-/// <item>At first launch, a keypair is generated and saved to the application data directory.</item>
-/// <item>The keypair is used to sign discovery broadcasts.</item>
-/// <item>The public key is exported and shared with other peers.</item>
-/// <item>The private key is kept secure and never exposed to other peers.</item>
-/// <item>The keypair is loaded from the application data directory on subsequent launches.</item>
+/// <item>Generates and persists ECDSA P-256 keypairs in the app data directory.</item>
+/// <item>Exports and imports public keys in Base64 for discovery announcements.</item>
+/// <item>Signs announcement payloads and verifies signatures from remote peers.</item>
+/// <item>Constructs canonical signing data from peer announcement fields.</item>
+/// <item>Keeps private keys local and never exposes them to other peers.</item>
 /// </list>
 /// </summary>
 public sealed class SigningKeyManager
