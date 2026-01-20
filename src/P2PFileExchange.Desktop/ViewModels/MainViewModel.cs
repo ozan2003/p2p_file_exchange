@@ -32,7 +32,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
-    private readonly SigningKeyManager m_signingKeyManager;
     private readonly AppSettings m_settings;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
@@ -61,7 +60,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService = peerDiscoveryService;
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
-        this.m_signingKeyManager = new SigningKeyManager();
         this.m_settings = settings;
 
         this.m_displayName = string.Empty;
@@ -241,7 +239,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 );
 
             // Load or create the ECDSA signing key for discovery authentication.
-            this.m_signingKey = this.m_signingKeyManager.GetOrCreateKeyPair(
+            this.m_signingKey = SigningKeyManager.GetOrCreateKeyPair(
                 securitySettings.SigningKeyPath
             );
 

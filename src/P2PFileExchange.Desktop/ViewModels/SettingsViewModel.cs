@@ -281,17 +281,17 @@ public sealed class SettingsViewModel : ReactiveObject
         this.StatusMessage = string.Empty;
 
         if (
-            !TryNormalizePath(
+            !this.TryNormalizePath(
                 this.DownloadDirectory,
                 "Download directory",
                 out string downloadDirectory
             )
-            || !TryNormalizePath(
+            || !this.TryNormalizePath(
                 this.CertificatePath,
                 "Certificate path",
                 out string certificatePath
             )
-            || !TryNormalizePath(
+            || !this.TryNormalizePath(
                 this.SigningKeyPath,
                 "Signing key path",
                 out string signingKeyPath

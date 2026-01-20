@@ -47,7 +47,7 @@ public sealed class SigningKeyManager
     /// Generates a new ECDSA P-256 keypair.
     /// </summary>
     /// <returns>A new ECDsa instance with generated keys.</returns>
-    public ECDsa GenerateKeyPair()
+    public static ECDsa GenerateKeyPair()
     {
         return ECDsa.Create(ECCurve.NamedCurves.nistP256);
     }
@@ -57,7 +57,7 @@ public sealed class SigningKeyManager
     /// </summary>
     /// <param name="key">The ECDSA key to save.</param>
     /// <param name="filePath">The target file path.</param>
-    public void SaveKeyPair(ECDsa key, string filePath)
+    public static void SaveKeyPair(ECDsa key, string filePath)
     {
         ArgumentNullException.ThrowIfNull(key, nameof(key));
         EnsureFilePath(filePath);
@@ -77,7 +77,7 @@ public sealed class SigningKeyManager
     /// </summary>
     /// <param name="filePath">The PEM file path.</param>
     /// <returns>The loaded ECDsa instance.</returns>
-    public ECDsa LoadKeyPair(string filePath)
+    public static ECDsa LoadKeyPair(string filePath)
     {
         EnsureFilePath(filePath);
 
@@ -99,9 +99,9 @@ public sealed class SigningKeyManager
     /// Loads the default signing key or generates and saves one if missing.
     /// </summary>
     /// <returns>The ECDsa keypair.</returns>
-    public ECDsa GetOrCreateDefaultKeyPair()
+    public static ECDsa GetOrCreateDefaultKeyPair()
     {
-        return this.GetOrCreateKeyPair(DefaultSigningKeyPath);
+        return GetOrCreateKeyPair(DefaultSigningKeyPath);
     }
 
     /// <summary>
@@ -109,15 +109,15 @@ public sealed class SigningKeyManager
     /// </summary>
     /// <param name="filePath">The key file path.</param>
     /// <returns>The ECDsa keypair.</returns>
-    public ECDsa GetOrCreateKeyPair(string filePath)
+    public static ECDsa GetOrCreateKeyPair(string filePath)
     {
         if (File.Exists(filePath))
         {
-            return this.LoadKeyPair(filePath);
+            return LoadKeyPair(filePath);
         }
 
-        ECDsa key = this.GenerateKeyPair();
-        this.SaveKeyPair(key, filePath);
+        ECDsa key = GenerateKeyPair();
+        SaveKeyPair(key, filePath);
         return key;
     }
 
