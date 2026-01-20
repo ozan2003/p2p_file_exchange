@@ -32,18 +32,9 @@ indent_size = 2
 [*.{props,targets,config,nuspec}]
 indent_size = 2
 
-# Shell scripts
-[*.sh]
-end_of_line = lf
-
 # Markdown files
 [*.md]
 trim_trailing_whitespace = false
-
-# C++ Files
-[*.{cpp,h,in}]
-curly_bracket_next_line = true
-indent_brace_style = Allman
 
 # C# and Visual Basic files
 [*.{cs,vb}]
