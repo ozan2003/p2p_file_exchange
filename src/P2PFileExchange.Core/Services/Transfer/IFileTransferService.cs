@@ -83,7 +83,7 @@ public interface IFileTransferService : IAsyncDisposable
     );
 
     /// <summary>
-    /// Responds to a pending transfer request by accepting or rejecting it.
+    /// Responds to a pending transfer request by sending the user's decision back to the sender.
     /// </summary>
     /// <param name="requestId">The request ID from <see cref="TransferRequestEventArgs"/>.</param>
     /// <param name="response">The response to send (Accepted or Rejected).</param>

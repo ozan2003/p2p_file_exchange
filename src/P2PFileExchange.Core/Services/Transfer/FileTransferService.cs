@@ -379,11 +379,12 @@ public sealed class FileTransferService : IFileTransferService
                 .WriteMetadataAsync(sslStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
 
-            // Wait for the receiver to accept or reject the transfer.
+            // Transfer response is prompted when the peer receives metadata.
             TransferResponse response = await FileTransferProtocol
                 .ReadResponseAsync(sslStream, cancellationToken)
                 .ConfigureAwait(false);
 
+            // If the peer rejected the transfer, notify and exit.
             if (response == TransferResponse.Rejected)
             {
                 TransferFailed?.Invoke(
@@ -652,7 +653,8 @@ public sealed class FileTransferService : IFileTransferService
 
             metadata.FileName = SanitizeFileName(metadata.FileName);
 
-            // Look up the sender's display name if available.
+            // Transfer request handling
+            // Name lookup for UI display
             string? senderDisplayName = this.m_displayNameLookup?.Invoke(
                 remoteIpAddress
             );
@@ -662,6 +664,7 @@ public sealed class FileTransferService : IFileTransferService
             TaskCompletionSource<TransferResponse> responseTcs = new();
             this.m_pendingRequests[requestId] = responseTcs;
 
+            // 1. Notify the UI of the incoming transfer request.
             TransferRequestReceived?.Invoke(
                 this,
                 new TransferRequestEventArgs(
@@ -672,13 +675,14 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
 
-            // Wait for user response with timeout.
+            // 2. Wait for user response with timeout.
             using CancellationTokenSource timeoutCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
             timeoutCts.CancelAfter(this.m_options.TransferRequestTimeout);
 
+            // 3. Get the user's response or timeout.
             TransferResponse userResponse;
             try
             {
@@ -696,7 +700,7 @@ public sealed class FileTransferService : IFileTransferService
                 userResponse = TransferResponse.Rejected;
             }
 
-            // Send the response back to the sender.
+            // 4. Send the response back to the sender.
             await FileTransferProtocol
                 .WriteResponseAsync(
                     encryptedStream,
@@ -705,6 +709,8 @@ public sealed class FileTransferService : IFileTransferService
                 )
                 .ConfigureAwait(false);
 
+            // 5. If rejected, exit early.
+            // Else, proceed to receive the file.
             if (userResponse == TransferResponse.Rejected)
             {
                 // User rejected - nothing more to do.
