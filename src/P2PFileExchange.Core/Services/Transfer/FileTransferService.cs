@@ -229,9 +229,11 @@ public sealed class FileTransferService : IFileTransferService
             }
 
             // Cancel all pending transfer requests.
-            foreach (var kvp in this.m_pendingRequests)
+            foreach (
+                TaskCompletionSource<TransferResponse> tcs in this.m_pendingRequests.Values
+            )
             {
-                kvp.Value.TrySetCanceled();
+                tcs.TrySetCanceled();
             }
 
             this.m_pendingRequests.Clear();
