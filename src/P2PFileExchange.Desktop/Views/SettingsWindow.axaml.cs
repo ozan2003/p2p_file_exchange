@@ -1,7 +1,6 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
-using P2PFileExchange.Desktop;
 using P2PFileExchange.Desktop.ViewModels;
 
 namespace P2PFileExchange.Desktop.Views;
