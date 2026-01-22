@@ -114,15 +114,9 @@ internal static class FileTransferProtocol
             .ConfigureAwait(false);
 
         // Create metadata object from JSON payload.
-        FileMetadata? metadata = JsonSerializer.Deserialize<FileMetadata>(
-            jsonPayload,
-            s_jsonOptions
-        );
-
-        if (metadata == null)
-        {
-            throw new InvalidDataException("Metadata payload is invalid.");
-        }
+        FileMetadata? metadata =
+            JsonSerializer.Deserialize<FileMetadata>(jsonPayload, s_jsonOptions)
+            ?? throw new InvalidDataException("Metadata payload is invalid.");
 
         return metadata;
     }
