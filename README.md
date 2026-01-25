@@ -1,5 +1,11 @@
 # P2P File Exchange
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-10.0-blue.svg)](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+[![Stars](https://img.shields.io/github/stars/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange/commits/master)
+[![Code Size](https://img.shields.io/github/languages/code-size/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange)
+
 Peer-to-peer file transfer app for local networks. It discovers peers via UDP
 broadcast and sends files over TCP with per-chunk integrity checks,
 all accessible through a cross-platform desktop UI built with Avalonia.
