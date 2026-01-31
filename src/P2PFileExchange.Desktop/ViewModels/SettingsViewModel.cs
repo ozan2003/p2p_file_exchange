@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Reactive;
 using System.Threading.Tasks;
@@ -487,7 +488,7 @@ public sealed class SettingsViewModel : ReactiveObject
         }
 
         FolderPickerOpenOptions options = new() { Title = title };
-        System.Collections.Generic.IReadOnlyList<IStorageFolder> folders =
+        IReadOnlyList<IStorageFolder> folders =
             await window.StorageProvider.OpenFolderPickerAsync(options);
 
         return folders.Count > 0 ? folders[0].Path.LocalPath : null;
@@ -513,7 +514,7 @@ public sealed class SettingsViewModel : ReactiveObject
             AllowMultiple = false,
             FileTypeFilter = fileTypes,
         };
-        System.Collections.Generic.IReadOnlyList<IStorageFile> files =
+        IReadOnlyList<IStorageFile> files =
             await window.StorageProvider.OpenFilePickerAsync(options);
 
         return files.Count > 0 ? files[0].Path.LocalPath : null;
