@@ -60,8 +60,8 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
         ushort tcpPort,
-        string displayName,
-        string certificateFingerprint,
+        ReadOnlyMemory<char> displayName,
+        ReadOnlyMemory<char> certificateFingerprint,
         ECDsa signingKey,
         CancellationToken cancellationToken
     );
@@ -75,7 +75,7 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// Updates the local display name used for broadcasts.
     /// </summary>
     /// <param name="displayName">The display name.</param>
-    void UpdateDisplayName(string displayName);
+    void UpdateDisplayName(ReadOnlySpan<char> displayName);
 
     /// <summary>
     /// The currently discovered peers.

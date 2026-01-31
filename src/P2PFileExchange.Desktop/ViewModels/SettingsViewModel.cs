@@ -523,13 +523,13 @@ public sealed class SettingsViewModel : ReactiveObject
     /// Normalizes a file system path from user input.
     /// </summary>
     private bool TryNormalizePath(
-        string? value,
-        string fieldName,
+        ReadOnlySpan<char> value,
+        ReadOnlySpan<char> fieldName,
         out string normalized
     )
     {
         normalized = string.Empty;
-        if (string.IsNullOrWhiteSpace(value))
+        if (value.IsEmpty || MemoryExtensions.IsWhiteSpace(value))
         {
             this.StatusMessage = $"{fieldName} is required.";
             return false;
@@ -537,7 +537,7 @@ public sealed class SettingsViewModel : ReactiveObject
 
         try
         {
-            normalized = Path.GetFullPath(value.Trim());
+            normalized = Path.GetFullPath(value.Trim().ToString());
             return true;
         }
         catch (Exception)

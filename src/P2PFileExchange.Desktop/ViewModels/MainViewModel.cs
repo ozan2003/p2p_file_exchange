@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Reactive;
 using System.Reactive.Linq;
 using System.Security.Cryptography;
@@ -301,20 +302,20 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_signingKey?.Dispose();
     }
 
-    private static string SanitizeDisplayName(string value)
+    private static string SanitizeDisplayName(ReadOnlySpan<char> value)
     {
-        if (string.IsNullOrEmpty(value))
+        if (value.IsEmpty || MemoryExtensions.IsWhiteSpace(value))
         {
             return string.Empty;
         }
 
-        string trimmed = value.Trim();
+        ReadOnlySpan<char> trimmed = value.Trim();
         if (trimmed.Length > MaxDisplayNameLength)
         {
             trimmed = trimmed[..MaxDisplayNameLength];
         }
 
-        return trimmed;
+        return trimmed.ToString();
     }
 
     private async Task StartDiscoveryAsync()
@@ -339,8 +340,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             await this
                 .m_peerDiscoveryService.StartAsync(
                     this.m_fileTransferService.ListenerPort,
-                    this.EffectiveDisplayName,
-                    this.m_localFingerprint,
+                    this.EffectiveDisplayName.AsMemory(),
+                    this.m_localFingerprint.AsMemory(),
                     this.m_signingKey,
                     CancellationToken.None
                 )

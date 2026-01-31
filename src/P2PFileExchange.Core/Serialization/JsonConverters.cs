@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -11,7 +12,6 @@ namespace P2PFileExchange.Core.Serialization;
 /// </summary>
 public sealed class TimeSpanIso8601Converter : JsonConverter<TimeSpan>
 {
-    /// <inheritdoc />
     public override TimeSpan Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
@@ -25,26 +25,32 @@ public sealed class TimeSpanIso8601Converter : JsonConverter<TimeSpan>
 
         if (reader.TokenType != JsonTokenType.String)
         {
-            throw new JsonException("Expected an ISO 8601 duration string.");
+            throw new JsonException("Expected ISO 8601 duration.");
         }
 
-        string? value = reader.GetString();
-        if (string.IsNullOrWhiteSpace(value))
+        if (reader.ValueSpan.Length == 0)
         {
             return TimeSpan.Zero;
         }
 
+        char[] buffer = ArrayPool<char>.Shared.Rent(reader.ValueSpan.Length);
         try
         {
-            return XmlConvert.ToTimeSpan(value);
+            int charsWritten = reader.CopyString(buffer);
+            return XmlConvert.ToTimeSpan(
+                buffer.AsSpan(0, charsWritten).ToString()
+            );
         }
         catch (FormatException ex)
         {
             throw new JsonException("Invalid ISO 8601 duration.", ex);
         }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
     }
 
-    /// <inheritdoc />
     public override void Write(
         Utf8JsonWriter writer,
         TimeSpan value,
@@ -60,7 +66,6 @@ public sealed class TimeSpanIso8601Converter : JsonConverter<TimeSpan>
 /// </summary>
 public sealed class IPAddressConverter : JsonConverter<IPAddress>
 {
-    /// <inheritdoc />
     public override IPAddress Read(
         ref Utf8JsonReader reader,
         Type typeToConvert,
@@ -74,22 +79,37 @@ public sealed class IPAddressConverter : JsonConverter<IPAddress>
 
         if (reader.TokenType != JsonTokenType.String)
         {
-            throw new JsonException("Expected an IP address string.");
+            throw new JsonException("Expected IP address string.");
         }
 
-        string? value = reader.GetString();
-        if (
-            string.IsNullOrWhiteSpace(value)
-            || !IPAddress.TryParse(value, out IPAddress? address)
-        )
+        ReadOnlySpan<byte> utf8 = reader.HasValueSequence
+            ? reader.ValueSequence.ToArray()
+            : reader.ValueSpan;
+
+        if (utf8.Length == 0)
         {
-            throw new JsonException("Invalid IP address.");
+            throw new JsonException("Empty IP address string.");
         }
 
-        return address;
+        char[] buffer = ArrayPool<char>.Shared.Rent(utf8.Length);
+        try
+        {
+            int charsWritten = reader.CopyString(buffer);
+            ReadOnlySpan<char> chars = buffer.AsSpan(0, charsWritten);
+
+            if (!IPAddress.TryParse(chars, out IPAddress? address))
+            {
+                throw new JsonException("Invalid IP address.");
+            }
+
+            return address;
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+        }
     }
 
-    /// <inheritdoc />
     public override void Write(
         Utf8JsonWriter writer,
         IPAddress value,

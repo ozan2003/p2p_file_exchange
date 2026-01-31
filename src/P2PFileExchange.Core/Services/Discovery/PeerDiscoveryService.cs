@@ -165,8 +165,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <inheritdoc />
     public async Task StartAsync(
         ushort tcpPort,
-        string displayName,
-        string certificateFingerprint,
+        ReadOnlyMemory<char> displayName,
+        ReadOnlyMemory<char> certificateFingerprint,
         ECDsa signingKey,
         CancellationToken cancellationToken
     )
@@ -189,9 +189,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             }
 
             this.m_tcpPort = tcpPort;
-            this.m_displayName = displayName?.Trim() ?? string.Empty;
-            this.m_certificateFingerprint =
-                certificateFingerprint ?? string.Empty;
+            this.m_displayName = displayName.Trim().ToString();
+            this.m_certificateFingerprint = certificateFingerprint
+                .Trim()
+                .ToString();
             this.m_signingKey = signingKey;
             this.m_localPublicKey = SigningKeyManager.ExportPublicKey(
                 signingKey
@@ -285,9 +286,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
-    public void UpdateDisplayName(string displayName)
+    public void UpdateDisplayName(ReadOnlySpan<char> displayName)
     {
-        this.m_displayName = displayName?.Trim() ?? string.Empty;
+        this.m_displayName = displayName.Trim().ToString();
     }
 
     /// <inheritdoc />
@@ -340,9 +341,13 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     /// <param name="name">The raw display name.</param>
     /// <returns>The normalized display name, or "Unknown" if empty.</returns>
-    private static string NormalizeDisplayName(string? name)
+    private static string NormalizeDisplayName(ReadOnlySpan<char> name)
     {
-        return string.IsNullOrWhiteSpace(name) ? "Unknown" : name.Trim();
+        if (name.IsEmpty || MemoryExtensions.IsWhiteSpace(name))
+        {
+            return "Unknown";
+        }
+        return name.Trim().ToString();
     }
 
     /// <summary>
@@ -350,9 +355,11 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     /// <param name="fingerprint">The fingerprint to validate.</param>
     /// <returns>True if the fingerprint is valid; otherwise, false.</returns>
-    private static bool IsValidCertificateFingerprint(string? fingerprint)
+    private static bool IsValidCertificateFingerprint(
+        ReadOnlySpan<char> fingerprint
+    )
     {
-        if (string.IsNullOrWhiteSpace(fingerprint))
+        if (fingerprint.IsEmpty || MemoryExtensions.IsWhiteSpace(fingerprint))
         {
             return false;
         }
@@ -364,7 +371,14 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         }
 
         // Verify all characters are valid hex digits.
-        return fingerprint.All(char.IsAsciiHexDigit);
+        foreach (char ch in fingerprint)
+        {
+            if (!char.IsAsciiHexDigit(ch))
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     /// <summary>
