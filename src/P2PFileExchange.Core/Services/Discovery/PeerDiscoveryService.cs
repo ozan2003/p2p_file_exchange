@@ -550,7 +550,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 }
 
                 // Announcement signature is verified here.
-                if (!this.VerifyAnnouncementSignature(announcement))
+                if (!VerifyAnnouncementSignature(announcement))
                 {
                     StatusChanged?.Invoke(
                         this,
@@ -649,7 +649,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     /// <param name="announcement">The announcement to verify.</param>
     /// <returns>True if the signature is valid; otherwise, false.</returns>
-    private bool VerifyAnnouncementSignature(PeerAnnouncement announcement)
+    private static bool VerifyAnnouncementSignature(
+        PeerAnnouncement announcement
+    )
     {
         if (string.IsNullOrWhiteSpace(announcement.PublicKey))
         {
