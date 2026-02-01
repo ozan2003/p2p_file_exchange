@@ -8,6 +8,24 @@ using P2PFileExchange.Core.Utilities;
 namespace P2PFileExchange.Core.Services.Security;
 
 /// <summary>
+/// Severity levels for audit log events.
+/// </summary>
+public enum AuditSeverity
+{
+    /// <summary>Normal operations (handshake complete, peer trusted).</summary>
+    Info,
+
+    /// <summary>Suspicious but not blocking (timestamp slightly off).</summary>
+    Warning,
+
+    /// <summary>Security violation (invalid signature, replay).</summary>
+    Error,
+
+    /// <summary>Active attack suspected (key mismatch, tampering).</summary>
+    Critical,
+}
+
+/// <summary>
 /// Audit log for security-related events.
 /// Records trust decisions, key changes, and other security events.
 /// </summary>
@@ -34,66 +52,122 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// </summary>
     public static class EventTypes
     {
-        /// <summary>
-        /// A new peer was trusted for the first time.
-        /// </summary>
+        #region Identity Events
+
+        /// <summary>New Ed25519 keypair created.</summary>
+        public const string IdentityGenerated = "IDENTITY_GENERATED";
+
+        /// <summary>Existing identity decrypted and loaded.</summary>
+        public const string IdentityLoaded = "IDENTITY_LOADED";
+
+        /// <summary>Identity key exported to file.</summary>
+        public const string IdentityExported = "IDENTITY_EXPORTED";
+
+        /// <summary>Old identity deleted, new one generated.</summary>
+        public const string IdentityRegenerated = "IDENTITY_REGENERATED";
+
+        /// <summary>Master password updated.</summary>
+        public const string PasswordChanged = "PASSWORD_CHANGED";
+
+        /// <summary>Password stored in OS keyring for auto-unlock.</summary>
+        public const string AutoUnlockEnabled = "AUTO_UNLOCK_ENABLED";
+
+        /// <summary>Password removed from OS keyring.</summary>
+        public const string AutoUnlockDisabled = "AUTO_UNLOCK_DISABLED";
+
+        // Legacy aliases for backward compatibility
+        /// <summary>The identity key was unlocked.</summary>
+        public const string IdentityKeyUnlocked = "IDENTITY_LOADED";
+
+        /// <summary>The identity key was created.</summary>
+        public const string IdentityKeyCreated = "IDENTITY_GENERATED";
+
+        #endregion Identity Events
+
+        #region Discovery Events
+
+        /// <summary>First contact with peer, signature verified.</summary>
+        public const string NewPeerDiscovered = "NEW_PEER_DISCOVERED";
+
+        /// <summary>A new peer was explicitly trusted by user.</summary>
         public const string NewPeerTrusted = "NEW_PEER_TRUSTED";
 
-        /// <summary>
-        /// A key mismatch was detected (possible MITM attack).
-        /// </summary>
+        /// <summary>Peer presented different Ed25519 key than expected.</summary>
         public const string KeyMismatchDetected = "KEY_MISMATCH_DETECTED";
 
-        /// <summary>
-        /// A key change was approved after user verification.
-        /// </summary>
+        /// <summary>User approved a key change for existing peer.</summary>
         public const string KeyChangeApproved = "KEY_CHANGE_APPROVED";
 
-        /// <summary>
-        /// A peer was blocked by the user.
-        /// </summary>
+        /// <summary>User blocked a peer.</summary>
         public const string PeerBlocked = "PEER_BLOCKED";
 
-        /// <summary>
-        /// A peer was unblocked by the user.
-        /// </summary>
+        /// <summary>User unblocked a peer.</summary>
         public const string PeerUnblocked = "PEER_UNBLOCKED";
 
-        /// <summary>
-        /// A peer was removed from the trust database.
-        /// </summary>
+        /// <summary>Peer deleted from trust database.</summary>
         public const string PeerRemoved = "PEER_REMOVED";
 
-        /// <summary>
-        /// A secure connection was established.
-        /// </summary>
-        public const string SecureConnectionEstablished =
-            "SECURE_CONNECTION_ESTABLISHED";
+        /// <summary>Ed25519 signature verification failed.</summary>
+        public const string SignatureInvalid = "SIGNATURE_INVALID";
 
-        /// <summary>
-        /// A transfer was completed successfully.
-        /// </summary>
+        /// <summary>PeerId didn't match derived from public key.</summary>
+        public const string PeerIdSpoofing = "PEERID_SPOOFING";
+
+        /// <summary>Duplicate nonce detected (replay attack).</summary>
+        public const string ReplayDetected = "REPLAY_DETECTED";
+
+        /// <summary>Timestamp outside acceptable range.</summary>
+        public const string TimestampInvalid = "TIMESTAMP_INVALID";
+
+        #endregion Discovery Events
+
+        #region Connection Events
+
+        /// <summary>SecureP2PStream handshake started.</summary>
+        public const string HandshakeInitiated = "HANDSHAKE_INITIATED";
+
+        /// <summary>Handshake successful, session keys derived.</summary>
+        public const string HandshakeComplete = "HANDSHAKE_COMPLETE";
+
+        /// <summary>Handshake timeout or error.</summary>
+        public const string HandshakeFailed = "HANDSHAKE_FAILED";
+
+        /// <summary>Peer key didn't match TOFU expectation during handshake.</summary>
+        public const string KeyMismatchHandshake = "KEY_MISMATCH_HANDSHAKE";
+
+        /// <summary>Frame tag verification failed (tampering detected).</summary>
+        public const string TamperingDetected = "TAMPERING_DETECTED";
+
+        /// <summary>Frame received out of order (replay attempt).</summary>
+        public const string FrameOutOfOrder = "FRAME_OUT_OF_ORDER";
+
+        /// <summary>Stream disposed, session keys cleared.</summary>
+        public const string ConnectionClosed = "CONNECTION_CLOSED";
+
+        // Legacy alias
+        /// <summary>A secure connection was established.</summary>
+        public const string SecureConnectionEstablished = "HANDSHAKE_COMPLETE";
+
+        #endregion Connection Events
+
+        #region Transfer Events
+
+        /// <summary>Transfer request received from peer.</summary>
+        public const string TransferRequested = "TRANSFER_REQUESTED";
+
+        /// <summary>User accepted incoming transfer.</summary>
+        public const string TransferAccepted = "TRANSFER_ACCEPTED";
+
+        /// <summary>A transfer was completed successfully.</summary>
         public const string TransferCompleted = "TRANSFER_COMPLETED";
 
-        /// <summary>
-        /// A transfer failed.
-        /// </summary>
+        /// <summary>A transfer failed.</summary>
         public const string TransferFailed = "TRANSFER_FAILED";
 
-        /// <summary>
-        /// A transfer was rejected by the user.
-        /// </summary>
+        /// <summary>A transfer was rejected by the user.</summary>
         public const string TransferRejected = "TRANSFER_REJECTED";
 
-        /// <summary>
-        /// The identity key was unlocked.
-        /// </summary>
-        public const string IdentityKeyUnlocked = "IDENTITY_KEY_UNLOCKED";
-
-        /// <summary>
-        /// The identity key was created.
-        /// </summary>
-        public const string IdentityKeyCreated = "IDENTITY_KEY_CREATED";
+        #endregion Transfer Events
     }
 
     #endregion Audit Event Types
@@ -237,6 +311,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Timestamp INTEGER NOT NULL,
                 EventType TEXT NOT NULL,
+                Severity TEXT NOT NULL DEFAULT 'Info',
                 PeerId TEXT,
                 PeerName TEXT,
                 Details TEXT,
@@ -246,7 +321,13 @@ public sealed class SecurityAuditLog : IAsyncDisposable
 
             CREATE INDEX IF NOT EXISTS idx_timestamp ON AuditLog(Timestamp);
             CREATE INDEX IF NOT EXISTS idx_event_type ON AuditLog(EventType);
+            CREATE INDEX IF NOT EXISTS idx_severity ON AuditLog(Severity);
             CREATE INDEX IF NOT EXISTS idx_peer_id ON AuditLog(PeerId);
+            """;
+
+        // Migration: Add Severity column if it doesn't exist (for existing databases)
+        const string migrationSql = """
+            ALTER TABLE AuditLog ADD COLUMN Severity TEXT NOT NULL DEFAULT 'Info';
             """;
 
         await using SqliteCommand command = this.m_connection!.CreateCommand();
@@ -254,6 +335,21 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         _ = await command
             .ExecuteNonQueryAsync(cancellationToken)
             .ConfigureAwait(false);
+
+        // Try to add Severity column for existing databases (ignore if already exists)
+        try
+        {
+            await using SqliteCommand migrationCommand =
+                this.m_connection.CreateCommand();
+            migrationCommand.CommandText = migrationSql;
+            _ = await migrationCommand
+                .ExecuteNonQueryAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (SqliteException)
+        {
+            // Column already exists, ignore
+        }
     }
 
     /// <summary>
@@ -285,6 +381,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// Logs a security event.
     /// </summary>
     /// <param name="eventType">The type of event (use <see cref="EventTypes"/> constants).</param>
+    /// <param name="severity">The severity level of the event.</param>
     /// <param name="peerId">The peer ID associated with the event (optional).</param>
     /// <param name="peerName">The peer name associated with the event (optional).</param>
     /// <param name="details">Additional details about the event (optional).</param>
@@ -293,6 +390,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task LogEventAsync(
         string eventType,
+        AuditSeverity severity = AuditSeverity.Info,
         Guid? peerId = null,
         string? peerName = null,
         string? details = null,
@@ -307,8 +405,8 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         const string sql = """
-            INSERT INTO AuditLog (Timestamp, EventType, PeerId, PeerName, Details, IPAddress, Success)
-            VALUES (@timestamp, @eventType, @peerId, @peerName, @details, @ipAddress, @success)
+            INSERT INTO AuditLog (Timestamp, EventType, Severity, PeerId, PeerName, Details, IPAddress, Success)
+            VALUES (@timestamp, @eventType, @severity, @peerId, @peerName, @details, @ipAddress, @success)
             """;
 
         await this.m_dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -319,6 +417,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             command.CommandText = sql;
             command.Parameters.AddWithValue("@timestamp", timestamp);
             command.Parameters.AddWithValue("@eventType", eventType);
+            command.Parameters.AddWithValue("@severity", severity.ToString());
             command.Parameters.AddWithValue(
                 "@peerId",
                 peerId?.ToString() ?? (object)DBNull.Value
@@ -350,6 +449,153 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         }
     }
 
+    #region Identity Events
+
+    /// <summary>
+    /// Logs that the identity key was generated.
+    /// </summary>
+    public Task LogIdentityGeneratedAsync(
+        string fingerprint,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.IdentityGenerated,
+            AuditSeverity.Info,
+            details: $"Fingerprint: {fingerprint}",
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that the identity key was loaded/unlocked.
+    /// </summary>
+    public Task LogIdentityLoadedAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.IdentityLoaded,
+            AuditSeverity.Info,
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that the identity key was exported.
+    /// </summary>
+    public Task LogIdentityExportedAsync(
+        string destinationPath,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.IdentityExported,
+            AuditSeverity.Warning,
+            details: $"Exported to: {destinationPath}",
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that the identity was regenerated.
+    /// </summary>
+    public Task LogIdentityRegeneratedAsync(
+        string newFingerprint,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.IdentityRegenerated,
+            AuditSeverity.Warning,
+            details: $"New fingerprint: {newFingerprint}",
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that auto-unlock was enabled.
+    /// </summary>
+    public Task LogAutoUnlockEnabledAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.AutoUnlockEnabled,
+            AuditSeverity.Info,
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that auto-unlock was disabled.
+    /// </summary>
+    public Task LogAutoUnlockDisabledAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.AutoUnlockDisabled,
+            AuditSeverity.Info,
+            success: true,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    // Legacy method aliases for backward compatibility
+    /// <summary>
+    /// Logs that the identity key was unlocked.
+    /// </summary>
+    public Task LogIdentityKeyUnlockedAsync(
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogIdentityLoadedAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Logs that the identity key was created.
+    /// </summary>
+    public Task LogIdentityKeyCreatedAsync(
+        string fingerprint,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogIdentityGeneratedAsync(fingerprint, cancellationToken);
+    }
+
+    #endregion Identity Events
+
+    #region Discovery Events
+
+    /// <summary>
+    /// Logs that a new peer was discovered.
+    /// </summary>
+    public Task LogNewPeerDiscoveredAsync(
+        Guid peerId,
+        string peerName,
+        string fingerprint,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.NewPeerDiscovered,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            $"Fingerprint: {fingerprint}",
+            ipAddress,
+            true,
+            cancellationToken
+        );
+    }
+
     /// <summary>
     /// Logs that a new peer was trusted.
     /// </summary>
@@ -363,6 +609,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.NewPeerTrusted,
+            AuditSeverity.Info,
             peerId,
             peerName,
             $"Fingerprint: {fingerprint}",
@@ -386,6 +633,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.KeyMismatchDetected,
+            AuditSeverity.Critical,
             peerId,
             peerName,
             $"Old fingerprint: {oldFingerprint}, New fingerprint: {newFingerprint}",
@@ -407,6 +655,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.KeyChangeApproved,
+            AuditSeverity.Warning,
             peerId,
             peerName,
             $"New fingerprint: {newFingerprint}",
@@ -426,6 +675,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.PeerBlocked,
+            AuditSeverity.Warning,
             peerId,
             peerName,
             reason,
@@ -444,6 +694,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.PeerUnblocked,
+            AuditSeverity.Info,
             peerId,
             peerName,
             cancellationToken: cancellationToken
@@ -461,6 +712,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.PeerRemoved,
+            AuditSeverity.Info,
             peerId,
             peerName,
             cancellationToken: cancellationToken
@@ -468,7 +720,141 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     }
 
     /// <summary>
-    /// Logs a successful secure connection.
+    /// Logs an invalid signature during discovery.
+    /// </summary>
+    public Task LogSignatureInvalidAsync(
+        Guid peerId,
+        string? peerName = null,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.SignatureInvalid,
+            AuditSeverity.Error,
+            peerId,
+            peerName,
+            "Ed25519 signature verification failed",
+            ipAddress,
+            false,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs a PeerId spoofing attempt.
+    /// </summary>
+    public Task LogPeerIdSpoofingAsync(
+        Guid claimedPeerId,
+        Guid derivedPeerId,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.PeerIdSpoofing,
+            AuditSeverity.Critical,
+            claimedPeerId,
+            details: $"Claimed: {claimedPeerId}, Derived from key: {derivedPeerId}",
+            ipAddress: ipAddress,
+            success: false,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs a replay attack detection.
+    /// </summary>
+    public Task LogReplayDetectedAsync(
+        Guid peerId,
+        string? peerName = null,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.ReplayDetected,
+            AuditSeverity.Error,
+            peerId,
+            peerName,
+            "Duplicate nonce detected",
+            ipAddress,
+            false,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs an invalid timestamp.
+    /// </summary>
+    public Task LogTimestampInvalidAsync(
+        Guid peerId,
+        long timestamp,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.TimestampInvalid,
+            AuditSeverity.Warning,
+            peerId,
+            details: $"Timestamp: {timestamp} (outside acceptable range)",
+            ipAddress: ipAddress,
+            success: false,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    #endregion Discovery Events
+
+    #region Connection Events
+
+    /// <summary>
+    /// Logs that a handshake was initiated.
+    /// </summary>
+    public Task LogHandshakeInitiatedAsync(
+        Guid? peerId = null,
+        string? peerName = null,
+        bool isInitiator = false,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.HandshakeInitiated,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            $"Role: {(isInitiator ? "Initiator" : "Responder")}",
+            ipAddress,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that a handshake completed successfully.
+    /// </summary>
+    public Task LogHandshakeCompleteAsync(
+        Guid peerId,
+        string? peerName = null,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.HandshakeComplete,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            "Session keys derived successfully",
+            ipAddress,
+            true,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs a successful secure connection (alias for HandshakeComplete).
     /// </summary>
     public Task LogSecureConnectionAsync(
         Guid peerId,
@@ -477,15 +863,102 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         CancellationToken cancellationToken = default
     )
     {
-        return this.LogEventAsync(
-            EventTypes.SecureConnectionEstablished,
+        return this.LogHandshakeCompleteAsync(
             peerId,
             peerName,
+            ipAddress,
+            cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that a handshake failed.
+    /// </summary>
+    public Task LogHandshakeFailedAsync(
+        Guid? peerId = null,
+        string? reason = null,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.HandshakeFailed,
+            AuditSeverity.Error,
+            peerId,
+            details: reason ?? "Handshake timeout or error",
             ipAddress: ipAddress,
-            success: true,
+            success: false,
             cancellationToken: cancellationToken
         );
     }
+
+    /// <summary>
+    /// Logs a key mismatch during handshake.
+    /// </summary>
+    public Task LogKeyMismatchHandshakeAsync(
+        Guid peerId,
+        string expectedFingerprint,
+        string actualFingerprint,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.KeyMismatchHandshake,
+            AuditSeverity.Critical,
+            peerId,
+            details: $"Expected: {expectedFingerprint}, Actual: {actualFingerprint}",
+            ipAddress: ipAddress,
+            success: false,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that tampering was detected (frame tag verification failed).
+    /// </summary>
+    public Task LogTamperingDetectedAsync(
+        Guid? peerId = null,
+        long? frameNumber = null,
+        string? ipAddress = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.TamperingDetected,
+            AuditSeverity.Critical,
+            peerId,
+            details: frameNumber.HasValue
+                ? $"Frame #{frameNumber} tag verification failed"
+                : "Frame tag verification failed",
+            ipAddress: ipAddress,
+            success: false,
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs that a connection was closed.
+    /// </summary>
+    public Task LogConnectionClosedAsync(
+        Guid? peerId = null,
+        string? peerName = null,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.ConnectionClosed,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            "Session keys cleared",
+            cancellationToken: cancellationToken
+        );
+    }
+
+    #endregion Connection Events
+
+    #region Transfer Events
 
     /// <summary>
     /// Logs a completed transfer.
@@ -502,6 +975,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         string direction = isIncoming ? "received from" : "sent to";
         return this.LogEventAsync(
             EventTypes.TransferCompleted,
+            AuditSeverity.Info,
             peerId,
             peerName,
             $"File '{fileName}' ({fileSize} bytes) {direction} peer",
@@ -523,6 +997,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     {
         return this.LogEventAsync(
             EventTypes.TransferFailed,
+            AuditSeverity.Error,
             peerId,
             peerName,
             $"File '{fileName}' failed: {errorMessage ?? "Unknown error"}",
@@ -532,34 +1007,69 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     }
 
     /// <summary>
-    /// Logs that the identity key was unlocked.
+    /// Logs a transfer request received.
     /// </summary>
-    public Task LogIdentityKeyUnlockedAsync(
+    public Task LogTransferRequestedAsync(
+        Guid peerId,
+        string peerName,
+        string fileName,
+        long fileSize,
         CancellationToken cancellationToken = default
     )
     {
         return this.LogEventAsync(
-            EventTypes.IdentityKeyUnlocked,
+            EventTypes.TransferRequested,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            $"File '{fileName}' ({fileSize} bytes)",
+            cancellationToken: cancellationToken
+        );
+    }
+
+    /// <summary>
+    /// Logs a transfer was accepted.
+    /// </summary>
+    public Task LogTransferAcceptedAsync(
+        Guid peerId,
+        string peerName,
+        string fileName,
+        CancellationToken cancellationToken = default
+    )
+    {
+        return this.LogEventAsync(
+            EventTypes.TransferAccepted,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            $"File '{fileName}' accepted",
             success: true,
             cancellationToken: cancellationToken
         );
     }
 
     /// <summary>
-    /// Logs that the identity key was created.
+    /// Logs a transfer was rejected.
     /// </summary>
-    public Task LogIdentityKeyCreatedAsync(
-        string fingerprint,
+    public Task LogTransferRejectedAsync(
+        Guid peerId,
+        string peerName,
+        string fileName,
         CancellationToken cancellationToken = default
     )
     {
         return this.LogEventAsync(
-            EventTypes.IdentityKeyCreated,
-            details: $"Fingerprint: {fingerprint}",
-            success: true,
+            EventTypes.TransferRejected,
+            AuditSeverity.Info,
+            peerId,
+            peerName,
+            $"File '{fileName}' rejected by user",
+            success: false,
             cancellationToken: cancellationToken
         );
     }
+
+    #endregion Transfer Events
 
     #endregion Logging Methods
 
@@ -582,7 +1092,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         this.ThrowIfNotInitialized();
 
         const string sql = """
-            SELECT Id, Timestamp, EventType, PeerId, PeerName, Details, IPAddress, Success
+            SELECT Id, Timestamp, EventType, Severity, PeerId, PeerName, Details, IPAddress, Success
             FROM AuditLog
             WHERE PeerId = @peerId
             ORDER BY Timestamp DESC
@@ -613,7 +1123,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         this.ThrowIfNotInitialized();
 
         const string sql = """
-            SELECT Id, Timestamp, EventType, PeerId, PeerName, Details, IPAddress, Success
+            SELECT Id, Timestamp, EventType, Severity, PeerId, PeerName, Details, IPAddress, Success
             FROM AuditLog
             ORDER BY Timestamp DESC
             LIMIT @limit
@@ -640,7 +1150,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         this.ThrowIfNotInitialized();
 
         const string sql = """
-            SELECT Id, Timestamp, EventType, PeerId, PeerName, Details, IPAddress, Success
+            SELECT Id, Timestamp, EventType, Severity, PeerId, PeerName, Details, IPAddress, Success
             FROM AuditLog
             WHERE EventType = @eventType
             ORDER BY Timestamp DESC
@@ -696,21 +1206,24 @@ public sealed class SecurityAuditLog : IAsyncDisposable
                             reader.GetInt64(1)
                         ),
                         EventType = reader.GetString(2),
-                        PeerId = reader.IsDBNull(3)
+                        Severity = reader.IsDBNull(3)
+                            ? AuditSeverity.Info
+                            : (AuditSeverity)reader.GetInt32(3),
+                        PeerId = reader.IsDBNull(4)
                             ? null
-                            : Guid.Parse(reader.GetString(3)),
-                        PeerName = reader.IsDBNull(4)
-                            ? null
-                            : reader.GetString(4),
-                        Details = reader.IsDBNull(5)
+                            : Guid.Parse(reader.GetString(4)),
+                        PeerName = reader.IsDBNull(5)
                             ? null
                             : reader.GetString(5),
-                        IPAddress = reader.IsDBNull(6)
+                        Details = reader.IsDBNull(6)
                             ? null
                             : reader.GetString(6),
-                        Success = reader.IsDBNull(7)
+                        IPAddress = reader.IsDBNull(7)
                             ? null
-                            : reader.GetInt32(7) == 1,
+                            : reader.GetString(7),
+                        Success = reader.IsDBNull(8)
+                            ? null
+                            : reader.GetInt32(8) == 1,
                     }
                 );
             }
@@ -788,6 +1301,11 @@ public sealed record AuditLogEntry
     /// Gets or sets the type of event.
     /// </summary>
     public required string EventType { get; init; }
+
+    /// <summary>
+    /// Gets or sets the severity level of the event.
+    /// </summary>
+    public AuditSeverity Severity { get; init; } = AuditSeverity.Info;
 
     /// <summary>
     /// Gets or sets the peer ID associated with the event.
