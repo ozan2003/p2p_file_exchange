@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -1082,7 +1083,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <param name="limit">Maximum number of entries to return.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of audit log entries.</returns>
-    public async Task<System.Collections.Generic.List<AuditLogEntry>> GetEntriesForPeerAsync(
+    public async Task<List<AuditLogEntry>> GetEntriesForPeerAsync(
         Guid peerId,
         int limit = 100,
         CancellationToken cancellationToken = default
@@ -1114,7 +1115,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <param name="limit">Maximum number of entries to return.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of audit log entries.</returns>
-    public async Task<System.Collections.Generic.List<AuditLogEntry>> GetRecentEntriesAsync(
+    public async Task<List<AuditLogEntry>> GetRecentEntriesAsync(
         int limit = 100,
         CancellationToken cancellationToken = default
     )
@@ -1140,7 +1141,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <param name="limit">Maximum number of entries to return.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of audit log entries.</returns>
-    public async Task<System.Collections.Generic.List<AuditLogEntry>> GetEntriesByTypeAsync(
+    public async Task<List<AuditLogEntry>> GetEntriesByTypeAsync(
         string eventType,
         int limit = 100,
         CancellationToken cancellationToken = default
@@ -1169,14 +1170,14 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <summary>
     /// Executes a query and returns audit log entries.
     /// </summary>
-    private async Task<System.Collections.Generic.List<AuditLogEntry>> ExecuteQueryAsync(
+    private async Task<List<AuditLogEntry>> ExecuteQueryAsync(
         string sql,
         int limit,
         CancellationToken cancellationToken,
         params (string Name, object Value)[] parameters
     )
     {
-        System.Collections.Generic.List<AuditLogEntry> entries = [];
+        List<AuditLogEntry> entries = [];
 
         await this.m_dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try

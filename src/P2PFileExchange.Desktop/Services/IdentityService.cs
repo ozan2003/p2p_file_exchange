@@ -112,7 +112,7 @@ public sealed class IdentityService : IDisposable
                     await this
                         .m_keyManager.LoadAsync(
                             this.m_keyPath,
-                            autoSecret,
+                            autoSecret.AsMemory(),
                             cancellationToken
                         )
                         .ConfigureAwait(false);
@@ -148,7 +148,7 @@ public sealed class IdentityService : IDisposable
                 await this
                     .m_keyManager.LoadAsync(
                         this.m_keyPath,
-                        password,
+                        password.AsMemory(),
                         cancellationToken
                     )
                     .ConfigureAwait(false);
@@ -224,7 +224,7 @@ public sealed class IdentityService : IDisposable
             await this
                 .m_keyManager.GenerateAndSaveAsync(
                     this.m_keyPath,
-                    password,
+                    password.AsMemory(),
                     cancellationToken
                 )
                 .ConfigureAwait(false);
@@ -259,8 +259,8 @@ public sealed class IdentityService : IDisposable
             await this
                 .m_keyManager.ChangePasswordAsync(
                     this.m_keyPath,
-                    password,
-                    autoSecret,
+                    password.AsMemory(),
+                    autoSecret.AsMemory(),
                     cancellationToken
                 )
                 .ConfigureAwait(false);
@@ -340,7 +340,7 @@ public sealed class IdentityService : IDisposable
             await this
                 .m_keyManager.RegenerateAsync(
                     this.m_keyPath,
-                    password,
+                    password.AsMemory(),
                     cancellationToken
                 )
                 .ConfigureAwait(false);
@@ -373,8 +373,8 @@ public sealed class IdentityService : IDisposable
         await this
             .m_keyManager.ChangePasswordAsync(
                 this.m_keyPath,
-                currentPassword,
-                newPassword,
+                currentPassword.AsMemory(),
+                newPassword.AsMemory(),
                 cancellationToken
             )
             .ConfigureAwait(false);
@@ -431,8 +431,8 @@ public sealed class IdentityService : IDisposable
         await this
             .m_keyManager.ChangePasswordAsync(
                 this.m_keyPath,
-                autoSecret,
-                newPassword,
+                autoSecret.AsMemory(),
+                newPassword.AsMemory(),
                 cancellationToken
             )
             .ConfigureAwait(false);

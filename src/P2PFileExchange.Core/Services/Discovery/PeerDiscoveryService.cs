@@ -797,12 +797,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     private string CreateCanonicalSigningJson(
         Guid peerId,
-        string displayName,
+        ReadOnlySpan<char> displayName,
         IPAddress ipAddress,
         ushort tcpPort,
-        string publicKey,
+        ReadOnlySpan<char> publicKey,
         long timestamp,
-        string nonce
+        ReadOnlySpan<char> nonce
     )
     {
         ArrayBufferWriter<byte> buffer = new(256);
@@ -834,7 +834,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <summary>
     /// Computes a unique hash for a nonce to prevent replay attacks.
     /// </summary>
-    private static string ComputeNonceHash(Guid peerId, string nonce)
+    private static string ComputeNonceHash(
+        Guid peerId,
+        ReadOnlySpan<char> nonce
+    )
     {
         byte[] data = Encoding.UTF8.GetBytes($"{peerId}:{nonce}");
         byte[] hash = SHA256.HashData(data);

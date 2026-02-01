@@ -205,7 +205,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
     /// <exception cref="ArgumentException">Thrown if the public key is invalid.</exception>
     public async Task TrustPeerAsync(
         Guid peerId,
-        string displayName,
+        ReadOnlyMemory<char> displayName,
         byte[] ed25519PublicKey,
         CancellationToken cancellationToken = default
     )

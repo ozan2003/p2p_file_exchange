@@ -211,9 +211,8 @@ public sealed class IdentityKeyManager : IDisposable
     /// </summary>
     /// <param name="publicKey">The Ed25519 public key (32 bytes).</param>
     /// <returns>A formatted fingerprint string.</returns>
-    public static string ComputeFingerprint(byte[] publicKey)
+    public static string ComputeFingerprint(ReadOnlySpan<byte> publicKey)
     {
-        ArgumentNullException.ThrowIfNull(publicKey);
         if (publicKey.Length != PublicKeyLength)
         {
             throw new ArgumentException(
@@ -267,12 +266,11 @@ public sealed class IdentityKeyManager : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The derived key (32 bytes).</returns>
     public static async Task<byte[]> DeriveKeyAsync(
-        string password,
+        ReadOnlyMemory<char> password,
         byte[] salt,
         CancellationToken cancellationToken = default
     )
     {
-        ArgumentException.ThrowIfNullOrEmpty(password);
         ArgumentNullException.ThrowIfNull(salt);
         if (salt.Length != SaltLength)
         {
@@ -282,7 +280,7 @@ public sealed class IdentityKeyManager : IDisposable
             );
         }
 
-        byte[] passwordBytes = Encoding.UTF8.GetBytes(password);
+        byte[] passwordBytes = GetUtf8Bytes(password.Span);
         try
         {
             // Run Argon2id in a background task to avoid blocking
@@ -359,13 +357,19 @@ public sealed class IdentityKeyManager : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task GenerateAndSaveAsync(
         string filePath,
-        string password,
+        ReadOnlyMemory<char> password,
         CancellationToken cancellationToken = default
     )
     {
         this.ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        ArgumentException.ThrowIfNullOrEmpty(password);
+        if (password.IsEmpty)
+        {
+            throw new ArgumentException(
+                "Password cannot be empty.",
+                nameof(password)
+            );
+        }
 
         (byte[] publicKey, byte[] privateKey) = GenerateKeyPair();
         try
@@ -401,13 +405,19 @@ public sealed class IdentityKeyManager : IDisposable
     public static async Task SaveEncryptedKeyAsync(
         string filePath,
         byte[] privateKey,
-        string password,
+        ReadOnlyMemory<char> password,
         CancellationToken cancellationToken = default
     )
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
         ArgumentNullException.ThrowIfNull(privateKey);
-        ArgumentException.ThrowIfNullOrEmpty(password);
+        if (password.IsEmpty)
+        {
+            throw new ArgumentException(
+                "Password cannot be empty.",
+                nameof(password)
+            );
+        }
 
         if (privateKey.Length != PrivateKeyLength)
         {
@@ -485,13 +495,19 @@ public sealed class IdentityKeyManager : IDisposable
     /// <exception cref="InvalidDataException">Thrown if the file format is invalid.</exception>
     public async Task LoadAsync(
         string filePath,
-        string password,
+        ReadOnlyMemory<char> password,
         CancellationToken cancellationToken = default
     )
     {
         this.ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        ArgumentException.ThrowIfNullOrEmpty(password);
+        if (password.IsEmpty)
+        {
+            throw new ArgumentException(
+                "Password cannot be empty.",
+                nameof(password)
+            );
+        }
 
         byte[] fileData = await File.ReadAllBytesAsync(
                 filePath,
@@ -684,15 +700,27 @@ public sealed class IdentityKeyManager : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task ChangePasswordAsync(
         string filePath,
-        string currentPassword,
-        string newPassword,
+        ReadOnlyMemory<char> currentPassword,
+        ReadOnlyMemory<char> newPassword,
         CancellationToken cancellationToken = default
     )
     {
         this.ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        ArgumentException.ThrowIfNullOrEmpty(currentPassword);
-        ArgumentException.ThrowIfNullOrEmpty(newPassword);
+        if (currentPassword.IsEmpty)
+        {
+            throw new ArgumentException(
+                "Current password cannot be empty.",
+                nameof(currentPassword)
+            );
+        }
+        if (newPassword.IsEmpty)
+        {
+            throw new ArgumentException(
+                "New password cannot be empty.",
+                nameof(newPassword)
+            );
+        }
 
         // Ensure the key is loaded with the current password
         if (!this.IsLoaded)
@@ -720,13 +748,19 @@ public sealed class IdentityKeyManager : IDisposable
     /// <param name="cancellationToken">Cancellation token.</param>
     public async Task RegenerateAsync(
         string filePath,
-        string password,
+        ReadOnlyMemory<char> password,
         CancellationToken cancellationToken = default
     )
     {
         this.ThrowIfDisposed();
         ArgumentException.ThrowIfNullOrEmpty(filePath);
-        ArgumentException.ThrowIfNullOrEmpty(password);
+        if (password.IsEmpty)
+        {
+            throw new ArgumentException(
+                "Password cannot be empty.",
+                nameof(password)
+            );
+        }
 
         // Clear existing keys
         this.ClearKeys();
@@ -758,6 +792,21 @@ public sealed class IdentityKeyManager : IDisposable
             CryptographicOperations.ZeroMemory(this.m_publicKey);
             this.m_publicKey = null;
         }
+    }
+
+    /// <summary>
+    /// Gets UTF-8 bytes from a character span.
+    /// </summary>
+    /// <param name="chars">The character span to convert.</param>
+    /// <returns>
+    /// A byte array containing the UTF-8 encoded bytes of the input characters.
+    /// </returns>
+    private static byte[] GetUtf8Bytes(ReadOnlySpan<char> chars)
+    {
+        int byteCount = Encoding.UTF8.GetByteCount(chars);
+        byte[] bytes = new byte[byteCount];
+        Encoding.UTF8.GetBytes(chars, bytes);
+        return bytes;
     }
 
     private void ThrowIfDisposed()

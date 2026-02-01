@@ -171,7 +171,7 @@ public sealed class PeerTrustService : IPeerTrustService
         await this
             .m_trustManager.TrustPeerAsync(
                 peerId,
-                displayName,
+                displayName.AsMemory(),
                 publicKey,
                 cancellationToken
             )
@@ -210,7 +210,7 @@ public sealed class PeerTrustService : IPeerTrustService
             await this
                 .m_trustManager.TrustPeerAsync(
                     peerId,
-                    displayName,
+                    displayName.AsMemory(),
                     publicKey,
                     cancellationToken
                 )
