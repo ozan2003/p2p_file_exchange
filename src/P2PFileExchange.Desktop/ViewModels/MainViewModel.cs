@@ -261,8 +261,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 .StartListenerAsync(
                     0, // dynamic port
                     downloadDirectory,
-                    this.m_localCertificate,
-                    this.m_peerDiscoveryService.GetPeerFingerprintByIPAddress,
+                    this.m_identityKeyManager,
+                    this.m_peerDiscoveryService.GetPeerByIPAddress,
                     this.m_peerDiscoveryService.GetPeerDisplayNameByIPAddress,
                     CancellationToken.None
                 )

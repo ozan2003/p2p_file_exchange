@@ -3,15 +3,13 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using System.Net.Security;
 using System.Net.Sockets;
-using System.Security.Authentication;
 using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
+using P2PFileExchange.Core.Services.Security;
 using P2PFileExchange.Core.Utilities;
 
 namespace P2PFileExchange.Core.Services.Transfer;
@@ -62,11 +60,11 @@ public sealed class FileTransferService : IFileTransferService
     /// <summary>Download directory for inbound files.</summary>
     private string m_downloadDirectory = string.Empty;
 
-    /// <summary>Local TLS certificate.</summary>
-    private X509Certificate2? m_certificate;
+    /// <summary>Local Ed25519 identity key manager for SecureP2PStream.</summary>
+    private IdentityKeyManager? m_identityKeyManager;
 
-    /// <summary>Lookup for expected peer certificate fingerprints.</summary>
-    private Func<IPAddress, string?>? m_fingerprintLookup;
+    /// <summary>Lookup for known peer info by IP address for TOFU verification.</summary>
+    private Func<IPAddress, PeerInfo?>? m_peerLookup;
 
     /// <summary>Lookup for peer display names.</summary>
     private Func<IPAddress, string?>? m_displayNameLookup;
@@ -110,16 +108,16 @@ public sealed class FileTransferService : IFileTransferService
     public async Task StartListenerAsync(
         ushort port,
         string downloadDirectory,
-        X509Certificate2 certificate,
-        Func<IPAddress, string?> fingerprintLookup,
+        IdentityKeyManager identityKeyManager,
+        Func<IPAddress, PeerInfo?> peerLookup,
         CancellationToken cancellationToken
     )
     {
         await this.StartListenerAsync(
                 port,
                 downloadDirectory,
-                certificate,
-                fingerprintLookup,
+                identityKeyManager,
+                peerLookup,
                 displayNameLookup: null,
                 cancellationToken
             )
@@ -127,14 +125,14 @@ public sealed class FileTransferService : IFileTransferService
     }
 
     /// <summary>
-    /// Starts the TCP listener for inbound transfers with TLS support.
+    /// Starts the TCP listener for inbound transfers with secure P2P transport.
     /// </summary>
     /// <param name="port">The port to listen on. Use 0 for a dynamic port.</param>
     /// <param name="downloadDirectory">The directory where files are saved.</param>
-    /// <param name="certificate">The local TLS certificate with private key.</param>
-    /// <param name="fingerprintLookup">
-    /// A function to look up expected certificate fingerprints by IP address.
-    /// Returns null if the peer is unknown.
+    /// <param name="identityKeyManager">The local Ed25519 identity key manager (must be loaded).</param>
+    /// <param name="peerLookup">
+    /// A function to look up known peer info by IP address for TOFU verification.
+    /// Returns null if the peer is unknown (first contact).
     /// </param>
     /// <param name="displayNameLookup">
     /// A function to look up peer display names by IP address.
@@ -144,8 +142,8 @@ public sealed class FileTransferService : IFileTransferService
     public async Task StartListenerAsync(
         ushort port,
         string downloadDirectory,
-        X509Certificate2 certificate,
-        Func<IPAddress, string?> fingerprintLookup,
+        IdentityKeyManager identityKeyManager,
+        Func<IPAddress, PeerInfo?> peerLookup,
         Func<IPAddress, string?>? displayNameLookup,
         CancellationToken cancellationToken
     )
@@ -158,11 +156,17 @@ public sealed class FileTransferService : IFileTransferService
             );
         }
 
-        ArgumentNullException.ThrowIfNull(certificate, nameof(certificate));
         ArgumentNullException.ThrowIfNull(
-            fingerprintLookup,
-            nameof(fingerprintLookup)
+            identityKeyManager,
+            nameof(identityKeyManager)
         );
+        if (!identityKeyManager.IsLoaded)
+        {
+            throw new InvalidOperationException(
+                "Identity key must be loaded before starting the listener."
+            );
+        }
+        ArgumentNullException.ThrowIfNull(peerLookup, nameof(peerLookup));
 
         await this
             .m_listenerLock.WaitAsync(cancellationToken)
@@ -175,8 +179,8 @@ public sealed class FileTransferService : IFileTransferService
             }
 
             this.m_downloadDirectory = downloadDirectory;
-            this.m_certificate = certificate;
-            this.m_fingerprintLookup = fingerprintLookup;
+            this.m_identityKeyManager = identityKeyManager;
+            this.m_peerLookup = peerLookup;
             this.m_displayNameLookup = displayNameLookup;
             Directory.CreateDirectory(downloadDirectory);
 
@@ -242,8 +246,8 @@ public sealed class FileTransferService : IFileTransferService
             this.m_listener = null;
             this.m_listenerCts = null;
             this.m_acceptLoopTask = null;
-            this.m_certificate = null;
-            this.m_fingerprintLookup = null;
+            this.m_identityKeyManager = null;
+            this.m_peerLookup = null;
             this.m_displayNameLookup = null;
             this.ListenerPort = 0;
         }
@@ -337,6 +341,17 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
+            // Ensure identity key is loaded
+            if (
+                this.m_identityKeyManager is null
+                || !this.m_identityKeyManager.IsLoaded
+            )
+            {
+                throw new InvalidOperationException(
+                    "Identity key must be loaded before sending files."
+                );
+            }
+
             // Connect to the peer via TCP.
             using TcpClient client = new();
             await client
@@ -346,42 +361,37 @@ public sealed class FileTransferService : IFileTransferService
 
             await using NetworkStream networkStream = client.GetStream();
 
-            // Set up TLS with certificate pinning validation.
-            await using SslStream sslStream = new(
+            // Create secure P2P stream with X25519 key exchange and ChaCha20-Poly1305 encryption.
+            await using SecureP2PStream secureStream = new(
                 networkStream,
-                leaveInnerStreamOpen: false,
-                userCertificateValidationCallback: (_, certificate, _, _) =>
-                    ValidatePeerCertificate(certificate, peer)
+                this.m_identityKeyManager,
+                leaveOpen: false
             );
 
-            // Authenticate as client with timeout.
-            using CancellationTokenSource tlsTimeoutCts =
+            // Perform handshake as initiator (client).
+            // Pass peer info for TOFU verification.
+            using CancellationTokenSource handshakeTimeoutCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            tlsTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
+            handshakeTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
 
-            await sslStream
-                .AuthenticateAsClientAsync(
-                    new SslClientAuthenticationOptions
-                    {
-                        TargetHost = peer.DisplayName,
-                        ClientCertificates = null,
-                        CertificateRevocationCheckMode =
-                            X509RevocationMode.NoCheck,
-                    },
-                    tlsTimeoutCts.Token
+            await secureStream
+                .HandshakeAsync(
+                    peer,
+                    isInitiator: true,
+                    handshakeTimeoutCts.Token
                 )
                 .ConfigureAwait(false);
 
-            // Send metadata to the peer over TLS.
+            // Send metadata to the peer over the secure stream.
             await FileTransferProtocol
-                .WriteMetadataAsync(sslStream, metadata, cancellationToken)
+                .WriteMetadataAsync(secureStream, metadata, cancellationToken)
                 .ConfigureAwait(false);
 
             // Transfer response is prompted when the peer receives metadata.
             TransferResponse response = await FileTransferProtocol
-                .ReadResponseAsync(sslStream, cancellationToken)
+                .ReadResponseAsync(secureStream, cancellationToken)
                 .ConfigureAwait(false);
 
             // If the peer rejected the transfer, notify and exit.
@@ -418,7 +428,7 @@ public sealed class FileTransferService : IFileTransferService
             {
                 // Send each chunk to the peer.
                 await FileTransferProtocol
-                    .WriteChunkAsync(sslStream, chunk, cancellationToken)
+                    .WriteChunkAsync(secureStream, chunk, cancellationToken)
                     .ConfigureAwait(false);
 
                 ++chunkIndex;
@@ -448,14 +458,25 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
         }
-        catch (AuthenticationException)
+        catch (SecureP2PException ex)
         {
+            string errorMessage = ex.ErrorCode switch
+            {
+                SecureP2PErrorCode.IdentityMismatch =>
+                    $"Identity verification failed for {peer.DisplayName}: {ex.Message}",
+                SecureP2PErrorCode.AuthenticationFailed =>
+                    $"Authentication failed with {peer.DisplayName}: {ex.Message}",
+                SecureP2PErrorCode.HandshakeTimeout =>
+                    $"Secure connection timed out with {peer.DisplayName}.",
+                _ =>
+                    $"Secure connection failed with {peer.DisplayName}: {ex.Message}",
+            };
             TransferFailed?.Invoke(
                 this,
                 new TransferFailedEventArgs(
                     transferId,
                     TransferMode.Send,
-                    $"Failed to establish secure connection with {peer.DisplayName}. Certificate verification failed."
+                    errorMessage
                 )
             );
         }
@@ -483,55 +504,6 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
         }
-    }
-
-    /// <summary>
-    /// Validates the peer's certificate by comparing its SHA-256 fingerprint
-    /// against the expected fingerprint from PeerInfo.
-    /// </summary>
-    /// <param name="certificate">The certificate presented by the peer.</param>
-    /// <param name="peer">The target peer with expected fingerprint.</param>
-    /// <returns>True if the certificate matches; otherwise, false.</returns>
-    private static bool ValidatePeerCertificate(
-        X509Certificate? certificate,
-        PeerInfo peer
-    )
-    {
-        if (certificate == null)
-        {
-            return false;
-        }
-
-        // Compute the SHA-256 fingerprint of the presented certificate.
-        byte[] certBytes = certificate.GetRawCertData();
-        byte[] hashBytes = SHA256.HashData(certBytes);
-        string presentedFingerprint = Convert.ToHexString(hashBytes);
-
-        // Get expected fingerprint from peer info.
-        string expectedFingerprint = peer.CertificateFingerprint;
-
-        // If no expected fingerprint is known, allow the connection.
-        if (string.IsNullOrWhiteSpace(expectedFingerprint))
-        {
-            return true;
-        }
-
-        // Compare fingerprints (case-insensitive).
-        bool isValid = string.Equals(
-            presentedFingerprint,
-            expectedFingerprint,
-            StringComparison.OrdinalIgnoreCase
-        );
-
-        if (!isValid)
-        {
-            // Log possible MITM attack.
-            Console.Error.WriteLine(
-                $"[SECURITY] Possible MITM attack detected for peer {peer.DisplayName} ({peer.IPAddress}): expected fingerprint {expectedFingerprint}, got {presentedFingerprint}"
-            );
-        }
-
-        return isValid;
     }
 
     /// <inheritdoc />
@@ -580,9 +552,9 @@ public sealed class FileTransferService : IFileTransferService
     }
 
     /// <summary>
-    /// Handles an incoming file transfer connection with TLS. Reads metadata and chunks from the
-    /// SSL stream, verifies chunk integrity via SHA256, and writes data to disk.
-    /// Deletes partial files on failure or cancellation.
+    /// Handles an incoming file transfer connection with secure P2P transport.
+    /// Reads metadata and chunks from the encrypted stream, verifies chunk integrity
+    /// via SHA256, and writes data to disk. Deletes partial files on failure or cancellation.
     /// </summary>
     /// <param name="client">The accepted TCP client connection.</param>
     /// <param name="cancellationToken">A token to cancel the transfer.</param>
@@ -598,9 +570,20 @@ public sealed class FileTransferService : IFileTransferService
 
         try
         {
+            // Ensure identity key is loaded
+            if (
+                this.m_identityKeyManager is null
+                || !this.m_identityKeyManager.IsLoaded
+            )
+            {
+                throw new InvalidOperationException(
+                    "Identity key must be loaded to accept incoming transfers."
+                );
+            }
+
             using TcpClient tcpClient = client;
 
-            // Extract remote IP for fingerprint lookup.
+            // Extract remote IP for peer lookup.
             if (tcpClient.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
             {
                 remoteIpAddress = remoteEndPoint.Address;
@@ -616,39 +599,33 @@ public sealed class FileTransferService : IFileTransferService
 
             await using NetworkStream networkStream = tcpClient.GetStream();
 
-            // Wrap `networkStream` with TLS.
-            await using SslStream encryptedStream = new(
+            // Create secure P2P stream with X25519 key exchange and ChaCha20-Poly1305 encryption.
+            await using SecureP2PStream secureStream = new(
                 networkStream,
-                leaveInnerStreamOpen: false,
-                userCertificateValidationCallback: (_, certificate, _, _) =>
-                    this.ValidateRemoteCertificate(
-                        certificate,
-                        remoteIpAddress,
-                        remoteEndpoint
-                    )
+                this.m_identityKeyManager,
+                leaveOpen: false
             );
 
-            // Authenticate as server with our certificate.
-            using CancellationTokenSource tlsTimeoutCts =
+            // Look up expected peer info for TOFU verification.
+            PeerInfo? expectedPeer = this.m_peerLookup?.Invoke(remoteIpAddress);
+
+            // Perform handshake as responder (server).
+            using CancellationTokenSource handshakeTimeoutCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            tlsTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
-            await encryptedStream
-                .AuthenticateAsServerAsync(
-                    new SslServerAuthenticationOptions
-                    {
-                        ServerCertificate = this.m_certificate,
-                        ClientCertificateRequired = false,
-                        CertificateRevocationCheckMode =
-                            X509RevocationMode.NoCheck,
-                    },
-                    tlsTimeoutCts.Token
+            handshakeTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
+
+            await secureStream
+                .HandshakeAsync(
+                    expectedPeer,
+                    isInitiator: false,
+                    handshakeTimeoutCts.Token
                 )
                 .ConfigureAwait(false);
 
             FileMetadata metadata = await FileTransferProtocol
-                .ReadMetadataAsync(encryptedStream, cancellationToken)
+                .ReadMetadataAsync(secureStream, cancellationToken)
                 .ConfigureAwait(false);
 
             metadata.FileName = SanitizeFileName(metadata.FileName);
@@ -703,7 +680,7 @@ public sealed class FileTransferService : IFileTransferService
             // 4. Send the response back to the sender.
             await FileTransferProtocol
                 .WriteResponseAsync(
-                    encryptedStream,
+                    secureStream,
                     userResponse,
                     cancellationToken
                 )
@@ -749,7 +726,7 @@ public sealed class FileTransferService : IFileTransferService
             )
             {
                 FileChunk chunk = await FileTransferProtocol
-                    .ReadChunkAsync(encryptedStream, cancellationToken)
+                    .ReadChunkAsync(secureStream, cancellationToken)
                     .ConfigureAwait(false);
 
                 // Match the chunk index.
@@ -798,15 +775,29 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
         }
-        catch (AuthenticationException ex)
+        catch (SecureP2PException ex)
         {
             shouldDeleteFile = true;
+            string errorMessage = ex.ErrorCode switch
+            {
+                SecureP2PErrorCode.IdentityMismatch =>
+                    $"Identity verification failed: {ex.Message}",
+                SecureP2PErrorCode.AuthenticationFailed =>
+                    $"Authentication failed: {ex.Message}",
+                SecureP2PErrorCode.HandshakeTimeout =>
+                    "Secure connection timed out.",
+                SecureP2PErrorCode.TamperingDetected =>
+                    $"Data tampering detected: {ex.Message}",
+                SecureP2PErrorCode.ReplayDetected =>
+                    $"Replay attack detected: {ex.Message}",
+                _ => $"Secure connection failed: {ex.Message}",
+            };
             TransferFailed?.Invoke(
                 this,
                 new TransferFailedEventArgs(
                     transferId,
                     TransferMode.Receive,
-                    $"TLS authentication failed: {ex.Message}"
+                    errorMessage
                 )
             );
         }
@@ -854,65 +845,6 @@ public sealed class FileTransferService : IFileTransferService
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// Validates the remote peer's certificate by comparing its SHA-256 fingerprint
-    /// against the expected fingerprint from peer discovery.
-    /// </summary>
-    /// <param name="certificate">The certificate presented by the remote peer.</param>
-    /// <param name="remoteIpAddress">The IP address of the remote peer.</param>
-    /// <param name="remoteEndpoint">The full remote endpoint for logging.</param>
-    /// <returns>True if the certificate is valid; otherwise, false.</returns>
-    private bool ValidateRemoteCertificate(
-        X509Certificate? certificate,
-        IPAddress remoteIpAddress,
-        IPEndPoint remoteEndpoint
-    )
-    {
-        // If no certificate is presented, allow (server mode with ClientCertificateRequired=false).
-        if (certificate == null)
-        {
-            return true;
-        }
-
-        // Compute the SHA-256 fingerprint of the presented certificate.
-        byte[] certBytes = certificate.GetRawCertData();
-        byte[] hashBytes = SHA256.HashData(certBytes);
-        string presentedFingerprint = Convert.ToHexString(hashBytes);
-
-        // Look up the expected fingerprint for this peer.
-        string? expectedFingerprint = this.m_fingerprintLookup?.Invoke(
-            remoteIpAddress
-        );
-
-        // If no expected fingerprint is known, allow the connection (unknown peer).
-        if (string.IsNullOrWhiteSpace(expectedFingerprint))
-        {
-            return true;
-        }
-
-        // Compare fingerprints (case-insensitive).
-        bool isValid = string.Equals(
-            presentedFingerprint,
-            expectedFingerprint,
-            StringComparison.OrdinalIgnoreCase
-        );
-
-        if (!isValid)
-        {
-            // Log rejection reason via TransferFailed event with a temporary ID.
-            TransferFailed?.Invoke(
-                this,
-                new TransferFailedEventArgs(
-                    Guid.Empty,
-                    TransferMode.Receive,
-                    $"Certificate validation failed for {remoteEndpoint}: {expectedFingerprint}, got {presentedFingerprint}"
-                )
-            );
-        }
-
-        return isValid;
     }
 
     /// <summary>

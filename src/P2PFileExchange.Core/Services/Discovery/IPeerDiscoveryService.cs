@@ -83,6 +83,13 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     IReadOnlyCollection<PeerInfo> GetPeers();
 
     /// <summary>
+    /// Looks up a peer by their IP address.
+    /// </summary>
+    /// <param name="ipAddress">The IP address of the peer.</param>
+    /// <returns>The peer info, or null if not found.</returns>
+    PeerInfo? GetPeerByIPAddress(IPAddress ipAddress);
+
+    /// <summary>
     /// Looks up the expected certificate fingerprint for a peer by IP address.
     /// </summary>
     /// <param name="ipAddress">The IP address of the peer.</param>

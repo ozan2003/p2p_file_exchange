@@ -1,10 +1,10 @@
 using System;
 using System.Net;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
+using P2PFileExchange.Core.Services.Security;
 
 namespace P2PFileExchange.Core.Services.Transfer;
 
@@ -45,21 +45,21 @@ public interface IFileTransferService : IAsyncDisposable
     ushort ListenerPort { get; }
 
     /// <summary>
-    /// Starts the TCP listener for inbound transfers with TLS support.
+    /// Starts the TCP listener for inbound transfers with secure P2P transport.
     /// </summary>
     /// <param name="port">The port to listen on. Use 0 for a dynamic port.</param>
     /// <param name="downloadDirectory">The directory where files are saved.</param>
-    /// <param name="certificate">The local TLS certificate with private key.</param>
-    /// <param name="fingerprintLookup">
-    /// A function to look up expected certificate fingerprints by IP address.
-    /// Returns null if the peer is unknown.
+    /// <param name="identityKeyManager">The local Ed25519 identity key manager (must be loaded).</param>
+    /// <param name="peerLookup">
+    /// A function to look up known peer info by IP address for TOFU verification.
+    /// Returns null if the peer is unknown (first contact).
     /// </param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartListenerAsync(
         ushort port,
         string downloadDirectory,
-        X509Certificate2 certificate,
-        Func<IPAddress, string?> fingerprintLookup,
+        IdentityKeyManager identityKeyManager,
+        Func<IPAddress, PeerInfo?> peerLookup,
         CancellationToken cancellationToken
     );
 

@@ -341,6 +341,19 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
+    public PeerInfo? GetPeerByIPAddress(IPAddress ipAddress)
+    {
+        if (ipAddress == null)
+        {
+            return null;
+        }
+
+        return this.m_peers.Values.FirstOrDefault(peer =>
+            peer.IPAddress.Equals(ipAddress)
+        );
+    }
+
+    /// <inheritdoc />
     public string? GetPeerFingerprintByIPAddress(IPAddress ipAddress)
     {
         if (ipAddress == null)
