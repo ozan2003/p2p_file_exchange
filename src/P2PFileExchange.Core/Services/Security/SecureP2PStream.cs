@@ -80,7 +80,7 @@ public sealed class SecureP2PStream : Stream
     /// <summary>
     /// Default handshake timeout.
     /// </summary>
-    private static readonly TimeSpan DefaultHandshakeTimeout =
+    private static readonly TimeSpan s_defaultHandshakeTimeout =
         TimeSpan.FromSeconds(10);
 
     #endregion Constants
@@ -95,9 +95,6 @@ public sealed class SecureP2PStream : Stream
     private byte[]? m_rxKey;
     private ulong m_txFrameNumber;
     private ulong m_rxExpectedFrameNumber;
-
-    private byte[]? m_remoteIdentityPublicKey;
-    private bool m_isHandshakeComplete;
     private bool m_disposed;
 
     // Read buffering for partial frame reads
@@ -145,15 +142,15 @@ public sealed class SecureP2PStream : Stream
     /// <summary>
     /// Gets the remote peer's Ed25519 identity public key after successful handshake.
     /// </summary>
-    public byte[]? RemoteIdentityPublicKey => this.m_remoteIdentityPublicKey;
+    public byte[]? RemoteIdentityPublicKey { get; private set; }
 
     /// <summary>
     /// Gets the remote peer's identity fingerprint after successful handshake.
     /// </summary>
     public string? RemoteFingerprint =>
-        this.m_remoteIdentityPublicKey is not null
+        this.RemoteIdentityPublicKey is not null
             ? IdentityKeyManager.ComputeFingerprint(
-                this.m_remoteIdentityPublicKey
+                this.RemoteIdentityPublicKey
             )
             : null;
 
@@ -161,22 +158,22 @@ public sealed class SecureP2PStream : Stream
     /// Gets the remote peer's ID derived from their identity public key.
     /// </summary>
     public Guid? RemotePeerId =>
-        this.m_remoteIdentityPublicKey is not null
-            ? IdentityKeyManager.ComputePeerId(this.m_remoteIdentityPublicKey)
+        this.RemoteIdentityPublicKey is not null
+            ? IdentityKeyManager.ComputePeerId(this.RemoteIdentityPublicKey)
             : null;
 
     /// <summary>
     /// Gets whether the handshake has been completed.
     /// </summary>
-    public bool IsHandshakeComplete => this.m_isHandshakeComplete;
+    public bool IsHandshakeComplete { get; private set; }
 
     /// <inheritdoc />
     public override bool CanRead =>
-        this.m_isHandshakeComplete && this.m_baseStream.CanRead;
+        this.IsHandshakeComplete && this.m_baseStream.CanRead;
 
     /// <inheritdoc />
     public override bool CanWrite =>
-        this.m_isHandshakeComplete && this.m_baseStream.CanWrite;
+        this.IsHandshakeComplete && this.m_baseStream.CanWrite;
 
     /// <inheritdoc />
     public override bool CanSeek => false;
@@ -212,14 +209,14 @@ public sealed class SecureP2PStream : Stream
     )
     {
         this.ThrowIfDisposed();
-        if (this.m_isHandshakeComplete)
+        if (this.IsHandshakeComplete)
         {
             throw new InvalidOperationException("Handshake already completed.");
         }
 
         using CancellationTokenSource timeoutCts =
             CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(DefaultHandshakeTimeout);
+        timeoutCts.CancelAfter(s_defaultHandshakeTimeout);
         CancellationToken token = timeoutCts.Token;
 
         try
@@ -458,8 +455,8 @@ public sealed class SecureP2PStream : Stream
                     }
                 }
 
-                this.m_remoteIdentityPublicKey = theirIdentityPublic;
-                this.m_isHandshakeComplete = true;
+                this.RemoteIdentityPublicKey = theirIdentityPublic;
+                this.IsHandshakeComplete = true;
             }
             finally
             {
@@ -907,7 +904,7 @@ public sealed class SecureP2PStream : Stream
 
     private void ThrowIfNotHandshaked()
     {
-        if (!this.m_isHandshakeComplete)
+        if (!this.IsHandshakeComplete)
         {
             throw new InvalidOperationException(
                 "Handshake must be completed before performing stream operations."
