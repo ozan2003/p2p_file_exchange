@@ -118,7 +118,7 @@ flowchart TD
     F -->|Yes| G[Build Canonical JSON]
     G --> H{Verify Signature}
     H -->|Invalid| X6[Discard + Log]
-    H -->|Valid| I{PeerId = SHA256(PubKey)?}
+    H -->|Valid| I{PeerId matches SHA256 PubKey?}
     I -->|No| X7[Discard: ID Mismatch]
     I -->|Yes| J{Known Peer?}
     J -->|No| K[TOFU: Accept & Store]
