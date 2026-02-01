@@ -192,6 +192,60 @@
                 <TextBlock Text="Security"
                            FontWeight="SemiBold"
                            FontSize="14" />
+
+                <!-- Identity Section -->
+                <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}"
+                        CornerRadius="4"
+                        Padding="12"
+                        Margin="0,0,0,8">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Identity"
+                                   FontWeight="SemiBold"/>
+                        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                            <TextBlock Grid.Row="0"
+                                       Text="Your fingerprint"
+                                       VerticalAlignment="Center"/>
+                            <SelectableTextBlock Grid.Row="0"
+                                                  Grid.Column="1"
+                                                  Text="{Binding IdentityFingerprint}"
+                                                  FontFamily="Consolas, Courier New, monospace"
+                                                  FontSize="11"
+                                                  VerticalAlignment="Center"
+                                                  TextWrapping="Wrap"/>
+
+                            <TextBlock Grid.Row="1"
+                                       Text="Identity key path"
+                                       VerticalAlignment="Center"/>
+                            <TextBox Grid.Row="1"
+                                     Grid.Column="1"
+                                     Text="{Binding IdentityKeyPath, Mode=TwoWay}"
+                                     IsReadOnly="True"/>
+
+                            <TextBlock Grid.Row="2"
+                                       Text="Require password"
+                                       VerticalAlignment="Center"/>
+                            <CheckBox Grid.Row="2"
+                                      Grid.Column="1"
+                                      IsChecked="{Binding RequirePasswordOnStartup}"
+                                      Content="Require password on startup (more secure)"
+                                      ToolTip.Tip="When disabled, uses OS-protected storage for auto-unlock"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                            <Button Content="Export Identity Key"
+                                    Command="{Binding ExportIdentityKeyCommand}"
+                                    ToolTip.Tip="Export encrypted identity key for backup"/>
+                            <Button Content="Regenerate Identity"
+                                    Command="{Binding RegenerateIdentityCommand}"
+                                    ToolTip.Tip="Create a new identity (peers will see you as new)"/>
+                        </StackPanel>
+                        <TextBlock Text="Share your fingerprint with peers to verify your identity. Keep your identity key file secure."
+                                   FontSize="11"
+                                   Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                   TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- TLS Certificate Section -->
                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                     <TextBlock Grid.Row="0"
                                Text="Certificate path"

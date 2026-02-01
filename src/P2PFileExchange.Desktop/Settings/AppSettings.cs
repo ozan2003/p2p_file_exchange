@@ -78,6 +78,19 @@ public sealed class SecuritySettings
         SigningKeyManager.DefaultSigningKeyPath;
 
     /// <summary>
+    /// The Ed25519 identity key file path.
+    /// </summary>
+    public string IdentityKeyPath { get; set; } =
+        IdentityKeyManager.DefaultIdentityKeyPath;
+
+    /// <summary>
+    /// Whether to require a password on application startup.
+    /// When false, uses auto-unlock with OS-protected secret storage.
+    /// Default: true (require password for maximum security).
+    /// </summary>
+    public bool RequirePasswordOnStartup { get; set; } = true;
+
+    /// <summary>
     /// Normalizes settings and applies defaults for missing or invalid values.
     /// </summary>
     public void Normalize()
@@ -96,6 +109,11 @@ public sealed class SecuritySettings
         if (string.IsNullOrWhiteSpace(this.SigningKeyPath))
         {
             this.SigningKeyPath = SigningKeyManager.DefaultSigningKeyPath;
+        }
+
+        if (string.IsNullOrWhiteSpace(this.IdentityKeyPath))
+        {
+            this.IdentityKeyPath = IdentityKeyManager.DefaultIdentityKeyPath;
         }
     }
 }

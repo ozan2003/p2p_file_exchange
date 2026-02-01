@@ -1,10 +1,12 @@
 using System;
 using System.Threading.Tasks;
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using P2PFileExchange.Core.Services.Discovery;
+using P2PFileExchange.Core.Services.Security;
 using P2PFileExchange.Core.Services.Transfer;
 using P2PFileExchange.Desktop.Services;
 using P2PFileExchange.Desktop.Settings;
@@ -22,28 +24,77 @@ public partial class App : Application
 
     public override void Initialize()
     {
+        // Initialize libsodium for cryptographic operations
+        IdentityKeyManager.Initialize();
+
         AvaloniaXamlLoader.Load(this);
     }
 
-    public override void OnFrameworkInitializationCompleted()
+    public override async void OnFrameworkInitializationCompleted()
     {
         if (
             this.ApplicationLifetime
             is IClassicDesktopStyleApplicationLifetime desktop
         )
         {
-            this.m_serviceProvider = ConfigureServices();
-
+            // Show a splash or loading state while initializing identity
             MainWindow mainWindow = new();
+            desktop.MainWindow = mainWindow;
+
+            // Configure services (partial - identity service needs window)
+            (
+                ServiceProvider serviceProvider,
+                IdentityService identityService
+            ) = ConfigureServices(mainWindow);
+            this.m_serviceProvider = serviceProvider;
+
             IWindowProvider windowProvider =
                 this.m_serviceProvider.GetRequiredService<IWindowProvider>();
             windowProvider.MainWindow = mainWindow;
 
+            // Initialize identity key (prompts for password if needed)
+            IdentityInitResult initResult = await identityService
+                .InitializeAsync()
+                .ConfigureAwait(true);
+
+            if (
+                initResult
+                is IdentityInitResult.Cancelled
+                    or IdentityInitResult.TooManyAttempts
+            )
+            {
+                // User cancelled or too many failed attempts - shut down
+                desktop.Shutdown(1);
+                return;
+            }
+
+            if (initResult == IdentityInitResult.CorruptedFile)
+            {
+                // Show error and offer to regenerate
+                var errorDialog = new Window
+                {
+                    Title = "Identity Key Error",
+                    Width = 400,
+                    Height = 150,
+                    WindowStartupLocation = WindowStartupLocation.CenterScreen,
+                    Content = new TextBlock
+                    {
+                        Text =
+                            "Your identity key file is corrupted. Please delete it and restart the application.",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        Margin = new Thickness(20),
+                    },
+                };
+                await errorDialog.ShowDialog(mainWindow).ConfigureAwait(true);
+                desktop.Shutdown(2);
+                return;
+            }
+
+            // Identity initialized successfully - set up the main view model
             MainViewModel mainViewModel =
                 this.m_serviceProvider.GetRequiredService<MainViewModel>();
             mainWindow.DataContext = mainViewModel;
 
-            desktop.MainWindow = mainWindow;
             _ = mainViewModel.InitializeAsync();
 
             desktop.Exit += async (_, _) =>
@@ -56,7 +107,9 @@ public partial class App : Application
     /// <summary>
     /// Registers application services and view models.
     /// </summary>
-    private static ServiceProvider ConfigureServices()
+    private static (ServiceProvider, IdentityService) ConfigureServices(
+        Window mainWindow
+    )
     {
         ServiceCollection services = new();
         SettingsStore settingsStore = new();
@@ -66,6 +119,20 @@ public partial class App : Application
         services.AddSingleton(appSettings);
         services.AddSingleton(appSettings.Discovery);
         services.AddSingleton(appSettings.Transfer);
+
+        // Create identity key manager and service
+        IdentityKeyManager identityKeyManager = new();
+        WindowProvider windowProvider = new() { MainWindow = mainWindow };
+        DialogPasswordProvider passwordProvider = new(windowProvider);
+        IdentityService identityService = new(
+            identityKeyManager,
+            passwordProvider,
+            appSettings.Security.IdentityKeyPath,
+            appSettings.Security.RequirePasswordOnStartup
+        );
+
+        services.AddSingleton(identityKeyManager);
+        services.AddSingleton(identityService);
 
         services.AddSingleton<IPeerDiscoveryService>(
             provider => new PeerDiscoveryService(
@@ -77,11 +144,12 @@ public partial class App : Application
                 provider.GetRequiredService<FileTransferOptions>()
             )
         );
-        services.AddSingleton<IWindowProvider, WindowProvider>();
+        services.AddSingleton<IWindowProvider>(windowProvider);
+        services.AddSingleton<IPasswordProvider>(passwordProvider);
         services.AddSingleton<IFileDialogService, FileDialogService>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
-        return services.BuildServiceProvider();
+        return (services.BuildServiceProvider(), identityService);
     }
 
     /// <summary>
@@ -122,6 +190,11 @@ public partial class App : Application
         {
             await transferService.StopListenerAsync().ConfigureAwait(false);
         }
+
+        // Clear identity keys from memory
+        IdentityService? identityService =
+            this.m_serviceProvider.GetService<IdentityService>();
+        identityService?.Dispose();
 
         await this.m_serviceProvider.DisposeAsync().ConfigureAwait(false);
         this.m_serviceProvider = null;

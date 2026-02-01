@@ -25,6 +25,7 @@ public sealed class SettingsViewModel : ReactiveObject
     private readonly SettingsStore m_settingsStore;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IWindowProvider m_windowProvider;
+    private readonly IdentityService? m_identityService;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SettingsViewModel"/> class.
@@ -33,17 +34,20 @@ public sealed class SettingsViewModel : ReactiveObject
     /// <param name="settingsStore">The settings store.</param>
     /// <param name="fileTransferService">The file transfer service.</param>
     /// <param name="windowProvider">The window provider.</param>
+    /// <param name="identityService">The identity service (optional for backward compatibility).</param>
     public SettingsViewModel(
         AppSettings settings,
         SettingsStore settingsStore,
         IFileTransferService fileTransferService,
-        IWindowProvider windowProvider
+        IWindowProvider windowProvider,
+        IdentityService? identityService = null
     )
     {
         this.m_settings = settings;
         this.m_settingsStore = settingsStore;
         this.m_fileTransferService = fileTransferService;
         this.m_windowProvider = windowProvider;
+        this.m_identityService = identityService;
 
         this.LoadFromSettings();
 
@@ -62,6 +66,12 @@ public sealed class SettingsViewModel : ReactiveObject
         );
         this.ResetToDefaultsCommand = ReactiveCommand.Create(
             this.ResetToDefaults
+        );
+        this.ExportIdentityKeyCommand = ReactiveCommand.CreateFromTask(
+            this.ExportIdentityKeyAsync
+        );
+        this.RegenerateIdentityCommand = ReactiveCommand.CreateFromTask(
+            this.RegenerateIdentityAsync
         );
     }
 
@@ -178,6 +188,38 @@ public sealed class SettingsViewModel : ReactiveObject
     } = string.Empty;
 
     /// <summary>
+    /// The identity key path.
+    /// </summary>
+    public string IdentityKeyPath
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
+
+    /// <summary>
+    /// Whether to require password on startup.
+    /// </summary>
+    public bool RequirePasswordOnStartup
+    {
+        get;
+        set => this.RaiseAndSetIfChanged(ref field, value);
+    }
+
+    /// <summary>
+    /// The identity fingerprint for display.
+    /// </summary>
+    public string IdentityFingerprint
+    {
+        get;
+        private set => this.RaiseAndSetIfChanged(ref field, value);
+    } = string.Empty;
+
+    /// <summary>
+    /// Gets whether identity information is available.
+    /// </summary>
+    public bool HasIdentity => this.m_identityService?.IsReady ?? false;
+
+    /// <summary>
     /// The status message for validation and save feedback.
     /// </summary>
     public string StatusMessage
@@ -222,6 +264,16 @@ public sealed class SettingsViewModel : ReactiveObject
     /// Command to reset all settings to their default values.
     /// </summary>
     public ReactiveCommand<Unit, Unit> ResetToDefaultsCommand { get; }
+
+    /// <summary>
+    /// Command to export the identity key file.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> ExportIdentityKeyCommand { get; }
+
+    /// <summary>
+    /// Command to regenerate the identity key.
+    /// </summary>
+    public ReactiveCommand<Unit, Unit> RegenerateIdentityCommand { get; }
 
     /// <summary>
     /// Loads persisted settings into editable fields.
@@ -272,6 +324,16 @@ public sealed class SettingsViewModel : ReactiveObject
             .Security
             .CertificateValidityYears;
         this.SigningKeyPath = this.m_settings.Security.SigningKeyPath;
+        this.IdentityKeyPath = this.m_settings.Security.IdentityKeyPath;
+        this.RequirePasswordOnStartup = this.m_settings
+            .Security
+            .RequirePasswordOnStartup;
+
+        // Load identity fingerprint if available
+        if (this.m_identityService?.IsReady == true)
+        {
+            this.IdentityFingerprint = this.m_identityService.Fingerprint;
+        }
     }
 
     /// <summary>
@@ -296,6 +358,11 @@ public sealed class SettingsViewModel : ReactiveObject
                 this.SigningKeyPath,
                 "Signing key path",
                 out string signingKeyPath
+            )
+            || !this.TryNormalizePath(
+                this.IdentityKeyPath,
+                "Identity key path",
+                out string identityKeyPath
             )
         )
         {
@@ -341,6 +408,9 @@ public sealed class SettingsViewModel : ReactiveObject
         this.m_settings.Security.CertificateValidityYears = (int)
             this.CertificateValidityYears;
         this.m_settings.Security.SigningKeyPath = signingKeyPath;
+        this.m_settings.Security.IdentityKeyPath = identityKeyPath;
+        this.m_settings.Security.RequirePasswordOnStartup =
+            this.RequirePasswordOnStartup;
 
         try
         {
@@ -399,6 +469,9 @@ public sealed class SettingsViewModel : ReactiveObject
             CertificateManager.DefaultValidityYears;
         this.m_settings.Security.SigningKeyPath =
             SigningKeyManager.DefaultSigningKeyPath;
+        this.m_settings.Security.IdentityKeyPath =
+            IdentityKeyManager.DefaultIdentityKeyPath;
+        this.m_settings.Security.RequirePasswordOnStartup = true;
 
         try
         {
@@ -438,6 +511,180 @@ public sealed class SettingsViewModel : ReactiveObject
         if (!string.IsNullOrWhiteSpace(path))
         {
             this.DownloadDirectory = path;
+        }
+    }
+
+    /// <summary>
+    /// Exports the identity key file to a user-selected location.
+    /// </summary>
+    private async Task ExportIdentityKeyAsync()
+    {
+        if (this.m_identityService == null || !this.m_identityService.IsReady)
+        {
+            this.StatusMessage = "No identity key available to export.";
+            return;
+        }
+
+        Window? window = this.m_windowProvider.MainWindow;
+        if (window == null)
+        {
+            return;
+        }
+
+        FilePickerSaveOptions options = new()
+        {
+            Title = "Export Identity Key",
+            SuggestedFileName = "identity-backup.key",
+            FileTypeChoices =
+            [
+                new FilePickerFileType("Identity Key") { Patterns = ["*.key"] },
+            ],
+        };
+
+        IStorageFile? file = await window.StorageProvider.SaveFilePickerAsync(
+            options
+        );
+        if (file == null)
+        {
+            return;
+        }
+
+        try
+        {
+            await this.m_identityService.ExportKeyAsync(file.Path.LocalPath);
+            this.StatusMessage =
+                "Identity key exported successfully. Keep this file secure!";
+        }
+        catch (Exception ex)
+        {
+            this.StatusMessage = $"Failed to export identity key: {ex.Message}";
+        }
+    }
+
+    /// <summary>
+    /// Regenerates the identity key after user confirmation.
+    /// </summary>
+    private async Task RegenerateIdentityAsync()
+    {
+        if (this.m_identityService == null)
+        {
+            this.StatusMessage = "Identity service not available.";
+            return;
+        }
+
+        Window? window = this.m_windowProvider.MainWindow;
+        if (window == null)
+        {
+            return;
+        }
+
+        // Show confirmation dialog
+        var confirmDialog = new Window
+        {
+            Title = "Regenerate Identity",
+            Width = 450,
+            Height = 200,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            CanResize = false,
+            Content = new StackPanel
+            {
+                Margin = new Avalonia.Thickness(20),
+                Spacing = 16,
+                Children =
+                {
+                    new TextBlock
+                    {
+                        Text = "⚠️ Warning",
+                        FontWeight = Avalonia.Media.FontWeight.Bold,
+                        FontSize = 16,
+                    },
+                    new TextBlock
+                    {
+                        Text =
+                            "Regenerating your identity will:\n"
+                            + "• Create a new cryptographic identity\n"
+                            + "• All peers will see you as a new, untrusted peer\n"
+                            + "• You will need to verify your new fingerprint with peers\n\n"
+                            + "This action cannot be undone.",
+                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    },
+                    new StackPanel
+                    {
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia
+                            .Layout
+                            .HorizontalAlignment
+                            .Right,
+                        Spacing = 8,
+                        Children =
+                        {
+                            new Button
+                            {
+                                Content = "Cancel",
+                                Tag = false,
+                                Width = 80,
+                            },
+                            new Button
+                            {
+                                Content = "Regenerate",
+                                Tag = true,
+                                Width = 100,
+                            },
+                        },
+                    },
+                },
+            },
+        };
+
+        bool? result = null;
+        if (
+            confirmDialog.Content is StackPanel panel
+            && panel.Children[2] is StackPanel buttonPanel
+        )
+        {
+            foreach (var child in buttonPanel.Children)
+            {
+                if (child is Button button)
+                {
+                    button.Click += (_, _) =>
+                    {
+                        result = button.Tag is true;
+                        confirmDialog.Close();
+                    };
+                }
+            }
+        }
+
+        await confirmDialog.ShowDialog(window);
+
+        if (result != true)
+        {
+            return;
+        }
+
+        try
+        {
+            IdentityInitResult initResult =
+                await this.m_identityService.RegenerateKeyAsync();
+            if (initResult == IdentityInitResult.Created)
+            {
+                this.IdentityFingerprint = this.m_identityService.Fingerprint;
+                this.RaisePropertyChanged(nameof(this.HasIdentity));
+                this.StatusMessage =
+                    "Identity regenerated. Share your new fingerprint with peers.";
+            }
+            else if (initResult == IdentityInitResult.Cancelled)
+            {
+                this.StatusMessage = "Identity regeneration cancelled.";
+            }
+            else
+            {
+                this.StatusMessage = "Failed to regenerate identity.";
+            }
+        }
+        catch (Exception ex)
+        {
+            this.StatusMessage = $"Failed to regenerate identity: {ex.Message}";
         }
     }
 
