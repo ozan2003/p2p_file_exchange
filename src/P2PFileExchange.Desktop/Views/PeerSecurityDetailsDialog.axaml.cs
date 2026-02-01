@@ -63,13 +63,18 @@ public partial class PeerSecurityDetailsDialog : Window
     /// Sets the dialog content from a TrustedPeerInfo record.
     /// </summary>
     /// <param name="peerInfo">The trusted peer information.</param>
-    public void SetContent(TrustedPeerInfo peerInfo)
+    /// <param name="currentDisplayName">The current display name from discovery (optional, falls back to cached).</param>
+    public void SetContent(
+        TrustedPeerInfo peerInfo,
+        string? currentDisplayName = null
+    )
     {
         this.m_peerInfo = peerInfo;
 
-        this.PeerNameText.Text = peerInfo.DisplayName;
+        this.PeerNameText.Text =
+            currentDisplayName ?? peerInfo.CachedDisplayName ?? "Unknown";
         this.FingerprintText.Text = peerInfo.PublicKeyFingerprint;
-        this.FirstSeenText.Text = FormatDateTime(peerInfo.FirstSeen);
+        this.FirstSeenText.Text = FormatDateTime(peerInfo.FirstTrusted);
         this.LastSeenText.Text = FormatDateTime(peerInfo.LastSeen);
         this.TransferCountText.Text = peerInfo.TransferCount.ToString();
         this.FailedTransferCountText.Text =

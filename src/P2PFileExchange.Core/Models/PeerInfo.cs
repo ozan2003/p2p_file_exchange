@@ -4,7 +4,8 @@ using System.Net;
 namespace P2PFileExchange.Core.Models;
 
 /// <summary>
-/// Represents a peer discovered on the network.
+/// Represents a peer discovered on the network (runtime state).
+/// For trust-related data, see <see cref="TrustInfo"/>.
 /// </summary>
 public sealed class PeerInfo
 {
@@ -61,14 +62,25 @@ public sealed class PeerInfo
     public string IdentityFingerprint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Gets whether this peer has been verified via TOFU (Trust-On-First-Use).
-    /// A verified peer's identity public key has been seen before and matches.
+    /// Trust metadata from the TOFU database. Null if peer is not yet in database.
+    /// Set by PeerTrustService after verifying the peer.
     /// </summary>
-    public bool IsVerified { get; set; }
+    public TrustedPeerInfo? TrustInfo { get; set; }
 
     /// <summary>
-    /// Gets or sets when this peer's identity was first trusted (TOFU timestamp).
-    /// Null if the peer has not been trusted yet.
+    /// Gets whether this peer is explicitly trusted (TrustLevel.Trusted).
     /// </summary>
-    public DateTimeOffset? FirstTrusted { get; set; }
+    public bool IsTrusted => this.TrustInfo?.TrustLevel == TrustLevel.Trusted;
+
+    /// <summary>
+    /// Gets whether this peer is blocked (TrustLevel.Blocked).
+    /// </summary>
+    public bool IsBlocked => this.TrustInfo?.TrustLevel == TrustLevel.Blocked;
+
+    /// <summary>
+    /// Gets whether this peer is unknown (not in database or TrustLevel.Unknown).
+    /// </summary>
+    public bool IsUnknown =>
+        this.TrustInfo is null
+        || this.TrustInfo.TrustLevel == TrustLevel.Unknown;
 }

@@ -964,11 +964,13 @@ public sealed class PeerTrustManager : IAsyncDisposable
         return new TrustedPeerInfo
         {
             PeerId = Guid.Parse(reader.GetString(0)),
-            DisplayName = reader.GetString(1),
+            CachedDisplayName = reader.GetString(1),
             Ed25519PublicKey = (byte[])reader.GetValue(2),
             PublicKeyFingerprint = reader.GetString(3),
             TrustLevel = (TrustLevel)reader.GetInt32(4),
-            FirstSeen = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(5)),
+            FirstTrusted = DateTimeOffset.FromUnixTimeSeconds(
+                reader.GetInt64(5)
+            ),
             LastSeen = DateTimeOffset.FromUnixTimeSeconds(reader.GetInt64(6)),
             TransferCount = reader.GetInt32(7),
             FailedTransferCount = reader.GetInt32(8),

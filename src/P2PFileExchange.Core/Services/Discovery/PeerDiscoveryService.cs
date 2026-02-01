@@ -693,8 +693,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         IdentityPublicKey =
                             announcement.PublicKey ?? string.Empty,
                         IdentityFingerprint = identityFingerprint,
-                        FirstTrusted = now,
-                        IsVerified = false, // TOFU: not yet verified by user
+                        // TrustInfo is populated by PeerTrustService after verification
                     },
                     // Update existing peer info otherwise.
                     (_, existing) =>

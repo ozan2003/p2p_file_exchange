@@ -3,21 +3,15 @@ using System;
 namespace P2PFileExchange.Core.Models;
 
 /// <summary>
-/// Represents a trusted peer record from the TOFU trust database.
-/// Contains identity information, trust status, and usage statistics.
+/// Represents trust metadata for a peer, stored in the TOFU database.
+/// This contains only database-specific trust data; runtime network info is in <see cref="PeerInfo"/>.
 /// </summary>
 public sealed record TrustedPeerInfo
 {
     /// <summary>
     /// The unique peer identifier derived from the Ed25519 public key.
-    /// Computed as: new Guid(SHA256(publicKey).Take(16))
     /// </summary>
     public required Guid PeerId { get; init; }
-
-    /// <summary>
-    /// The display name of the peer, as provided during discovery.
-    /// </summary>
-    public required string DisplayName { get; init; }
 
     /// <summary>
     /// The Ed25519 public key of the peer (32 bytes).
@@ -46,9 +40,9 @@ public sealed record TrustedPeerInfo
     public required TrustLevel TrustLevel { get; init; }
 
     /// <summary>
-    /// The timestamp when this peer was first seen/trusted.
+    /// The timestamp when this peer was first trusted.
     /// </summary>
-    public required DateTimeOffset FirstSeen { get; init; }
+    public required DateTimeOffset FirstTrusted { get; init; }
 
     /// <summary>
     /// The timestamp when this peer was last seen online.
@@ -58,15 +52,21 @@ public sealed record TrustedPeerInfo
     /// <summary>
     /// The number of successful file transfers with this peer.
     /// </summary>
-    public required int TransferCount { get; init; }
+    public int TransferCount { get; init; }
 
     /// <summary>
     /// The number of failed file transfers with this peer.
     /// </summary>
-    public required int FailedTransferCount { get; init; }
+    public int FailedTransferCount { get; init; }
 
     /// <summary>
     /// Optional notes about this peer (e.g., "Work laptop", "Friend's phone").
     /// </summary>
     public string? Notes { get; init; }
+
+    /// <summary>
+    /// The last known display name (cached from discovery, may be stale).
+    /// Use <see cref="PeerInfo.DisplayName"/> for current name when peer is online.
+    /// </summary>
+    public string? CachedDisplayName { get; init; }
 }
