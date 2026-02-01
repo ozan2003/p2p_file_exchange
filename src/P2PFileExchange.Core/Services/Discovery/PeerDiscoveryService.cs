@@ -817,13 +817,13 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
         writer.WriteStartObject();
 
-        writer.WriteString(nameof(displayName), displayName);
-        writer.WriteString(nameof(ipAddress), ipAddress.ToString());
-        writer.WriteString(nameof(nonce), nonce);
-        writer.WriteString(nameof(peerId), peerId);
-        writer.WriteString(nameof(publicKey), publicKey);
-        writer.WriteNumber(nameof(tcpPort), tcpPort);
-        writer.WriteNumber(nameof(timestamp), timestamp);
+        writer.WriteString("displayName", displayName);
+        writer.WriteString("ipAddress", ipAddress.ToString());
+        writer.WriteString("nonce", nonce);
+        writer.WriteString("peerId", peerId);
+        writer.WriteString("publicKey", publicKey);
+        writer.WriteNumber("tcpPort", tcpPort);
+        writer.WriteNumber("timestamp", timestamp);
 
         writer.WriteEndObject();
         writer.Flush();
