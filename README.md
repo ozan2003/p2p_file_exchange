@@ -6,9 +6,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange/commits/master)
 [![Code Size](https://img.shields.io/github/languages/code-size/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange)
 
-Peer-to-peer file transfer app for local networks. It discovers peers via UDP
-broadcast and sends files over TCP with per-chunk integrity checks,
-all accessible through a cross-platform desktop UI built with Avalonia.
+Peer-to-peer file transfer app for local networks. Discovers peers via Ed25519-signed UDP broadcasts and transfers files over encrypted TCP connections using X25519 key exchange and ChaCha20-Poly1305 encryption, all through a cross-platform desktop UI built with Avalonia.
 
 > [!WARNING]
 > This app is not audited for security. Do not use it to transfer sensitive files
@@ -16,13 +14,14 @@ all accessible through a cross-platform desktop UI built with Avalonia.
 
 ## Features
 
-- Automatic peer discovery on the local network
-- ECDSA-signed discovery broadcasts to prevent peer impersonation
-- TLS-encrypted file transfers with certificate pinning
-- Per-chunk SHA-256 integrity validation
-- Drag-and-drop or file picker sending
-- Transfer progress, speed, and ETA tracking
-- Automatic download folder and collision-safe file naming
+- **Automatic peer discovery** on the local network via UDP broadcast
+- **Ed25519-signed discovery** to prevent peer impersonation
+- **End-to-end encrypted transfers** with X25519 + ChaCha20-Poly1305
+- **TOFU (Trust-On-First-Use)** identity verification with persistent trust database
+- **Per-chunk SHA-256** integrity validation
+- **Drag-and-drop** or file picker sending
+- **Transfer progress**, speed, and ETA tracking
+- **Automatic download folder** and collision-safe file naming
 
 ## Screenshots
 
@@ -51,13 +50,16 @@ between peers.
 Inbound files are saved to:
 
 ```text
-~/Downloads/P2PFileExchange
+~/Downloads/P2PFileExchange    (Linux)
+%USERPROFILE%\Downloads\P2PFileExchange    (Windows)
 ```
 
 ## Network Details
 
-- UDP broadcast port: `37020`
-- TCP listener port: dynamic (assigned at runtime)
+| Protocol | Port | Purpose |
+|----------|------|---------|
+| UDP | 37020 | Peer discovery broadcasts |
+| TCP | Dynamic | File transfers (port announced via discovery) |
 
 > [!NOTE]
 > If discovery or transfers do not work, ensure UDP broadcast and TCP traffic
@@ -65,44 +67,117 @@ Inbound files are saved to:
 
 ## Security
 
-### TLS Encryption
-
-All file transfers use TLS encryption with self-signed certificates. On first
-run, a certificate is generated and saved to:
+### Architecture Overview
 
 ```text
-~/.config/P2PFileExchange/peer.pfx    (Linux)
-%APPDATA%\P2PFileExchange\peer.pfx    (Windows)
+┌─────────────────────────────────────────────────────────────┐
+│                    Security Layers                          │
+├─────────────────────────────────────────────────────────────┤
+│  Identity      │  Ed25519 persistent keypair                │
+│  Key Exchange  │  X25519 ephemeral keys (forward secrecy)   │
+│  Encryption    │  ChaCha20-Poly1305 AEAD                    │
+│  Trust Model   │  TOFU with SQLite-backed database          │
+│  Integrity     │  SHA-256 per-chunk verification            │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-Certificate fingerprints are exchanged during peer discovery and verified during
-TLS handshake to prevent man-in-the-middle attacks.
+### Identity Keys
 
-### Discovery Signing
-
-Peer discovery broadcasts are authenticated using ECDSA (P-256) signatures. On
-first launch, a signing keypair is generated and saved alongside the certificate:
+On first run, an Ed25519 identity keypair is generated and encrypted at rest using Argon2id key derivation:
 
 ```text
-~/.config/P2PFileExchange/signing.key    (Linux)
-%APPDATA%\P2PFileExchange\signing.key    (Windows)
+~/.local/share/P2PFileExchange/identity.key    (Linux)
+%LOCALAPPDATA%\P2PFileExchange\identity.key    (Windows)
 ```
 
-Each discovery message includes:
+The identity provides:
 
-- Peer ID, display name, IP address, and TCP port
-- Certificate fingerprint
-- The sender's ECDSA public key
-- A signature over PeerId + DisplayName + TcpPort + CertificateFingerprint
+- **Peer ID**: Derived from SHA-256 of the public key
+- **Fingerprint**: Human-readable hash for verification
+- **Signatures**: For discovery authentication
 
-Receivers verify the signature before trusting the announcement. Messages with
-invalid signatures are discarded, preventing peer impersonation on the network.
+### Encrypted Transport
 
-Trusted discovery keys follow a trust-on-first-use (TOFU) model for the current
-session only. Other peers' ECDSA public keys are cached in memory and are not persisted across
-restarts by default.
+All file transfers use a custom encrypted transport (`SecureP2PStream`) that replaces TLS:
+
+1. **X25519 key exchange** - Ephemeral keys provide forward secrecy
+2. **HKDF key derivation** - Separate TX/RX session keys
+3. **Ed25519 mutual authentication** - Both peers prove identity
+4. **ChaCha20-Poly1305 frames** - Authenticated encryption with replay protection
+
+### Trust Model (TOFU)
+
+Peer identities follow Trust-On-First-Use:
+
+- First contact: Identity is stored in the trust database
+- Subsequent contacts: Identity must match stored key
+- Mismatch: Connection is rejected (potential MITM attack)
+
+Trust database location:
+
+```text
+~/.local/share/P2PFileExchange/trust.db    (Linux)
+%LOCALAPPDATA%\P2PFileExchange\trust.db    (Windows)
+```
+
+### Discovery Authentication
+
+Each discovery broadcast includes:
+
+- Peer ID, display name, IP address, TCP port
+- Ed25519 public key
+- Timestamp and random nonce (anti-replay)
+- Ed25519 signature over all fields
+
+Invalid signatures are silently discarded.
+
+## Documentation
+
+For detailed protocol specifications, see:
+
+| Document | Description |
+|----------|-------------|
+| [Security Architecture](docs/security.md) | Cryptographic design, threat model, trust database |
+| [Peer Discovery Protocol](docs/peer-discovery.md) | UDP broadcast, signed announcements, verification |
+| [File Transfer Protocol](docs/file-transfer.md) | TCP transport, chunking, integrity checks |
 
 ## Project Layout
 
-- `src/P2PFileExchange.Core`: discovery, protocol, and transfer logic
-- `src/P2PFileExchange.Desktop`: Avalonia UI client
+```text
+src/
+├── P2PFileExchange.Core/           # Core library
+│   ├── Models/                     # Data models
+│   ├── Services/
+│   │   ├── Discovery/              # UDP peer discovery
+│   │   ├── Security/               # Crypto, trust, audit
+│   │   └── Transfer/               # TCP file transfer
+│   └── Utilities/                  # Helpers
+│
+└── P2PFileExchange.Desktop/        # Avalonia UI client
+    ├── ViewModels/                 # MVVM view models
+    ├── Views/                      # AXAML views
+    └── Services/                   # UI services
+```
+
+## Building
+
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build release
+dotnet build -c Release
+
+# Run tests (if any)
+dotnet test
+
+# Publish for Linux
+dotnet publish src/P2PFileExchange.Desktop -c Release -r linux-x64
+
+# Publish for Windows
+dotnet publish src/P2PFileExchange.Desktop -c Release -r win-x64
+```
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
