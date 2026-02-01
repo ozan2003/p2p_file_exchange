@@ -2,6 +2,7 @@ using System;
 using System.Buffers.Binary;
 using System.IO;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -540,7 +541,17 @@ public sealed class SecureP2PStream : Stream
     }
 
     /// <inheritdoc />
-    public override async Task<int> ReadAsync(
+    public override Task<int> ReadAsync(
+        byte[] buffer,
+        int offset,
+        int count,
+        CancellationToken cancellationToken
+    )
+    {
+        return this.ReadAsyncCore(buffer, offset, count, cancellationToken);
+    }
+
+    private async Task<int> ReadAsyncCore(
         byte[] buffer,
         int offset,
         int count,
@@ -595,6 +606,44 @@ public sealed class SecureP2PStream : Stream
     }
 
     /// <inheritdoc />
+    public override ValueTask<int> ReadAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment))
+        {
+            return new ValueTask<int>(
+                this.ReadAsync(
+                    segment.Array!,
+                    segment.Offset,
+                    segment.Count,
+                    cancellationToken
+                )
+            );
+        }
+
+        return this.ReadAsyncWithCopyAsync(buffer, cancellationToken);
+    }
+
+    private async ValueTask<int> ReadAsyncWithCopyAsync(
+        Memory<byte> buffer,
+        CancellationToken cancellationToken
+    )
+    {
+        byte[] temp = new byte[buffer.Length];
+        int read = await this.ReadAsyncCore(
+                temp,
+                0,
+                temp.Length,
+                cancellationToken
+            )
+            .ConfigureAwait(false);
+        temp.AsMemory(0, read).CopyTo(buffer);
+        return read;
+    }
+
+    /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count)
     {
         this.WriteAsync(buffer, offset, count, CancellationToken.None)
@@ -604,7 +653,17 @@ public sealed class SecureP2PStream : Stream
     }
 
     /// <inheritdoc />
-    public override async Task WriteAsync(
+    public override Task WriteAsync(
+        byte[] buffer,
+        int offset,
+        int count,
+        CancellationToken cancellationToken
+    )
+    {
+        return this.WriteAsyncCore(buffer, offset, count, cancellationToken);
+    }
+
+    private async Task WriteAsyncCore(
         byte[] buffer,
         int offset,
         int count,
@@ -635,6 +694,37 @@ public sealed class SecureP2PStream : Stream
             currentOffset += chunkSize;
             remaining -= chunkSize;
         }
+    }
+
+    /// <inheritdoc />
+    public override ValueTask WriteAsync(
+        ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken = default
+    )
+    {
+        if (MemoryMarshal.TryGetArray(buffer, out ArraySegment<byte> segment))
+        {
+            return new ValueTask(
+                this.WriteAsync(
+                    segment.Array!,
+                    segment.Offset,
+                    segment.Count,
+                    cancellationToken
+                )
+            );
+        }
+
+        return this.WriteAsyncWithCopyAsync(buffer, cancellationToken);
+    }
+
+    private async ValueTask WriteAsyncWithCopyAsync(
+        ReadOnlyMemory<byte> buffer,
+        CancellationToken cancellationToken
+    )
+    {
+        byte[] temp = buffer.ToArray();
+        await this.WriteAsyncCore(temp, 0, temp.Length, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
