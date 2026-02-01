@@ -97,7 +97,7 @@ public partial class PeerSecurityDetailsDialog : Window
                 this.TrustBadge.Background = new SolidColorBrush(
                     Color.FromArgb(0x44, 0x44, 0xBB, 0x44)
                 );
-                this.TrustLevelText.Text = "✓ Trusted";
+                this.TrustLevelText.Text = "Trusted";
                 this.TrustLevelText.Foreground = new SolidColorBrush(
                     Color.FromRgb(0x44, 0xBB, 0x44)
                 );

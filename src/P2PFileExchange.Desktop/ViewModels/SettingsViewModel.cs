@@ -526,7 +526,7 @@ public sealed class SettingsViewModel : ReactiveObject
                 {
                     new TextBlock
                     {
-                        Text = "⚠️ Warning",
+                        Text = "Warning",
                         FontWeight = Avalonia.Media.FontWeight.Bold,
                         FontSize = 16,
                     },
