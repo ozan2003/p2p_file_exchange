@@ -4,7 +4,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
-using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -28,7 +27,6 @@ namespace P2PFileExchange.Desktop.ViewModels;
 public sealed class MainViewModel : ReactiveObject, IDisposable
 {
     private const int MaxDisplayNameLength = 64;
-    private const string DefaultCertificatePassword = "p2p-file-transfer";
 
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
@@ -40,9 +38,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
     [];
-
-    private X509Certificate2? m_localCertificate;
-    private string m_localFingerprint = string.Empty;
 
     private string m_displayName;
     private bool m_isDisposed;
@@ -247,18 +242,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 .m_peerTrustService.InitializeAsync()
                 .ConfigureAwait(false);
 
-            // Initialize the TLS certificate for file transfers.
-            SecuritySettings securitySettings = this.m_settings.Security;
-            this.m_localCertificate = CertificateManager.GetOrCreateCertificate(
-                securitySettings.CertificatePath,
-                DefaultCertificatePassword,
-                securitySettings.CertificateValidityYears
-            );
-            this.m_localFingerprint =
-                CertificateManager.GetCertificateFingerprint(
-                    this.m_localCertificate
-                );
-
             // Identity key is already loaded by IdentityService during app startup.
             if (!this.m_identityKeyManager.IsLoaded)
             {
@@ -326,7 +309,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.StopDiscoveryCommand.Dispose();
         this.SendFileCommand.Dispose();
 
-        this.m_localCertificate?.Dispose();
         // Note: m_identityKeyManager is managed by DI, not disposed here.
     }
 
@@ -367,7 +349,6 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 .m_peerDiscoveryService.StartAsync(
                     this.m_fileTransferService.ListenerPort,
                     this.EffectiveDisplayName.AsMemory(),
-                    this.m_localFingerprint.AsMemory(),
                     this.m_identityKeyManager,
                     CancellationToken.None
                 )

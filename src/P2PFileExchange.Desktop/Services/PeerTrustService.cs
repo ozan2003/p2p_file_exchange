@@ -295,7 +295,7 @@ public sealed class PeerTrustService : IPeerTrustService
         await this
             .m_auditLog.LogPeerUnblockedAsync(
                 peerId,
-                peer.DisplayName,
+                peer.CachedDisplayName ?? "Unknown",
                 cancellationToken
             )
             .ConfigureAwait(false);
@@ -372,7 +372,7 @@ public sealed class PeerTrustService : IPeerTrustService
         await this
             .m_auditLog.LogPeerRemovedAsync(
                 peerId,
-                peer.DisplayName,
+                peer.CachedDisplayName ?? "Unknown",
                 cancellationToken
             )
             .ConfigureAwait(false);

@@ -37,19 +37,6 @@ public sealed class PeerInfo
     public DateTimeOffset LastSeen { get; set; }
 
     /// <summary>
-    /// The SHA-256 fingerprint of the peer's TLS certificate (hex string).
-    /// Used for certificate pinning during TLS handshake validation.
-    /// </summary>
-    public string CertificateFingerprint { get; set; } = string.Empty;
-
-    /// <summary>
-    /// The verified ECDSA public key of the peer (base64-encoded).
-    /// Used for verifying discovery broadcast signatures.
-    /// </summary>
-    [Obsolete("Use IdentityPublicKey for Ed25519-based identity verification.")]
-    public string PublicKey { get; set; } = string.Empty;
-
-    /// <summary>
     /// The Ed25519 identity public key of the peer (base64-encoded, 32 bytes).
     /// Used for verifying discovery broadcast signatures and deriving the PeerId.
     /// </summary>

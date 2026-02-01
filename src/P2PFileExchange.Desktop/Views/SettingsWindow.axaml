@@ -245,50 +245,6 @@
                     </StackPanel>
                 </Border>
 
-                <!-- TLS Certificate Section -->
-                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="8">
-                    <TextBlock Grid.Row="0"
-                               Text="Certificate path"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Left" />
-                    <TextBox Grid.Row="0"
-                             Grid.Column="1"
-                             Text="{Binding CertificatePath, Mode=TwoWay}" />
-                    <Button Grid.Row="0"
-                            Grid.Column="2"
-                            Content="Browse..."
-                            Command="{Binding BrowseCertificatePathCommand}"
-                            MinWidth="80" />
-
-                    <TextBlock Grid.Row="1"
-                               Text="Certificate validity (years)"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Left" />
-                    <NumericUpDown Grid.Row="1"
-                                   Grid.Column="1"
-                                   Value="{Binding CertificateValidityYears}"
-                                   Minimum="1"
-                                   Maximum="100"
-                                   Increment="1"
-                                   FormatString="0"
-                                   Watermark="10"
-                                   Width="150"
-                                   HorizontalAlignment="Left" />
-
-                    <TextBlock Grid.Row="2"
-                               Text="Signing key path"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Left" />
-                    <TextBox Grid.Row="2"
-                             Grid.Column="1"
-                             Text="{Binding SigningKeyPath, Mode=TwoWay}" />
-                    <Button Grid.Row="2"
-                            Grid.Column="2"
-                            Content="Browse..."
-                            Command="{Binding BrowseSigningKeyPathCommand}"
-                            MinWidth="80" />
-                </Grid>
-
                 <TextBlock Text="Note: Discovery and security changes apply after restarting discovery or the app."
                            TextWrapping="Wrap"
                            FontSize="11"

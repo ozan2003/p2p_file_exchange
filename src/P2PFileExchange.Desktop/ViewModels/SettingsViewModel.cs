@@ -58,12 +58,6 @@ public sealed class SettingsViewModel : ReactiveObject
         this.BrowseDownloadDirectoryCommand = ReactiveCommand.CreateFromTask(
             this.BrowseDownloadDirectoryAsync
         );
-        this.BrowseCertificatePathCommand = ReactiveCommand.CreateFromTask(
-            this.BrowseCertificatePathAsync
-        );
-        this.BrowseSigningKeyPathCommand = ReactiveCommand.CreateFromTask(
-            this.BrowseSigningKeyPathAsync
-        );
         this.ResetToDefaultsCommand = ReactiveCommand.Create(
             this.ResetToDefaults
         );
@@ -161,33 +155,6 @@ public sealed class SettingsViewModel : ReactiveObject
     } = string.Empty;
 
     /// <summary>
-    /// The certificate path.
-    /// </summary>
-    public string CertificatePath
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
-
-    /// <summary>
-    /// The certificate validity in years.
-    /// </summary>
-    public decimal CertificateValidityYears
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    }
-
-    /// <summary>
-    /// The signing key path.
-    /// </summary>
-    public string SigningKeyPath
-    {
-        get;
-        set => this.RaiseAndSetIfChanged(ref field, value);
-    } = string.Empty;
-
-    /// <summary>
     /// The identity key path.
     /// </summary>
     public string IdentityKeyPath
@@ -251,16 +218,6 @@ public sealed class SettingsViewModel : ReactiveObject
     public ReactiveCommand<Unit, Unit> BrowseDownloadDirectoryCommand { get; }
 
     /// <summary>
-    /// Command to browse for the certificate file.
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> BrowseCertificatePathCommand { get; }
-
-    /// <summary>
-    /// Command to browse for the signing key file.
-    /// </summary>
-    public ReactiveCommand<Unit, Unit> BrowseSigningKeyPathCommand { get; }
-
-    /// <summary>
     /// Command to reset all settings to their default values.
     /// </summary>
     public ReactiveCommand<Unit, Unit> ResetToDefaultsCommand { get; }
@@ -319,11 +276,6 @@ public sealed class SettingsViewModel : ReactiveObject
         );
 
         this.DownloadDirectory = this.m_settings.DownloadDirectory;
-        this.CertificatePath = this.m_settings.Security.CertificatePath;
-        this.CertificateValidityYears = this.m_settings
-            .Security
-            .CertificateValidityYears;
-        this.SigningKeyPath = this.m_settings.Security.SigningKeyPath;
         this.IdentityKeyPath = this.m_settings.Security.IdentityKeyPath;
         this.RequirePasswordOnStartup = this.m_settings
             .Security
@@ -348,16 +300,6 @@ public sealed class SettingsViewModel : ReactiveObject
                 this.DownloadDirectory,
                 "Download directory",
                 out string downloadDirectory
-            )
-            || !this.TryNormalizePath(
-                this.CertificatePath,
-                "Certificate path",
-                out string certificatePath
-            )
-            || !this.TryNormalizePath(
-                this.SigningKeyPath,
-                "Signing key path",
-                out string signingKeyPath
             )
             || !this.TryNormalizePath(
                 this.IdentityKeyPath,
@@ -404,10 +346,6 @@ public sealed class SettingsViewModel : ReactiveObject
         );
 
         this.m_settings.DownloadDirectory = downloadDirectory;
-        this.m_settings.Security.CertificatePath = certificatePath;
-        this.m_settings.Security.CertificateValidityYears = (int)
-            this.CertificateValidityYears;
-        this.m_settings.Security.SigningKeyPath = signingKeyPath;
         this.m_settings.Security.IdentityKeyPath = identityKeyPath;
         this.m_settings.Security.RequirePasswordOnStartup =
             this.RequirePasswordOnStartup;
@@ -463,12 +401,6 @@ public sealed class SettingsViewModel : ReactiveObject
         // Apply defaults to download and security settings.
         this.m_settings.DownloadDirectory =
             FilePathUtilities.GetDefaultDownloadDirectory();
-        this.m_settings.Security.CertificatePath =
-            CertificateManager.DefaultCertificatePath;
-        this.m_settings.Security.CertificateValidityYears =
-            CertificateManager.DefaultValidityYears;
-        this.m_settings.Security.SigningKeyPath =
-            SigningKeyManager.DefaultSigningKeyPath;
         this.m_settings.Security.IdentityKeyPath =
             IdentityKeyManager.DefaultIdentityKeyPath;
         this.m_settings.Security.RequirePasswordOnStartup = true;
@@ -689,41 +621,6 @@ public sealed class SettingsViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// Opens a file picker for the certificate path.
-    /// </summary>
-    private async Task BrowseCertificatePathAsync()
-    {
-        string? path = await this.PickFileAsync(
-            "Select Certificate File",
-            [new FilePickerFileType("PFX Certificate") { Patterns = ["*.pfx"] }]
-        );
-        if (!string.IsNullOrWhiteSpace(path))
-        {
-            this.CertificatePath = path;
-        }
-    }
-
-    /// <summary>
-    /// Opens a file picker for the signing key path.
-    /// </summary>
-    private async Task BrowseSigningKeyPathAsync()
-    {
-        string? path = await this.PickFileAsync(
-            "Select Signing Key File",
-            [
-                new FilePickerFileType("Key File")
-                {
-                    Patterns = ["*.key", "*.pem"],
-                },
-            ]
-        );
-        if (!string.IsNullOrWhiteSpace(path))
-        {
-            this.SigningKeyPath = path;
-        }
-    }
-
-    /// <summary>
     /// Opens a folder picker dialog.
     /// </summary>
     private async Task<string?> PickFolderAsync(string title)
@@ -739,32 +636,6 @@ public sealed class SettingsViewModel : ReactiveObject
             await window.StorageProvider.OpenFolderPickerAsync(options);
 
         return folders.Count > 0 ? folders[0].Path.LocalPath : null;
-    }
-
-    /// <summary>
-    /// Opens a file picker dialog.
-    /// </summary>
-    private async Task<string?> PickFileAsync(
-        string title,
-        FilePickerFileType[] fileTypes
-    )
-    {
-        Window? window = this.m_windowProvider.MainWindow;
-        if (window == null)
-        {
-            return null;
-        }
-
-        FilePickerOpenOptions options = new()
-        {
-            Title = title,
-            AllowMultiple = false,
-            FileTypeFilter = fileTypes,
-        };
-        IReadOnlyList<IStorageFile> files =
-            await window.StorageProvider.OpenFilePickerAsync(options);
-
-        return files.Count > 0 ? files[0].Path.LocalPath : null;
     }
 
     /// <summary>

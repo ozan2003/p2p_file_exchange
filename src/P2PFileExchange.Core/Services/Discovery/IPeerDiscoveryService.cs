@@ -15,7 +15,7 @@ namespace P2PFileExchange.Core.Services.Discovery;
 /// <item>Manages the discovery lifecycle (start/stop) and exposes running state.</item>
 /// <item>Emits peer update/removal events and status messages for UI consumption.</item>
 /// <item>Provides access to the local peer ID, broadcast port, and discovered peers.</item>
-/// <item>Supplies certificate fingerprints used by the transfer layer for pinning.</item>
+/// <item>All peers are identified by their Ed25519 public key.</item>
 /// </list>
 /// </summary>
 public interface IPeerDiscoveryService : IAsyncDisposable
@@ -51,17 +51,15 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     ushort BroadcastPort { get; }
 
     /// <summary>
-    /// Starts discovery with the provided TCP listener port, display name, certificate fingerprint, and identity key manager.
+    /// Starts discovery with the provided TCP listener port, display name, and identity key manager.
     /// </summary>
     /// <param name="tcpPort">The TCP port used for file transfers.</param>
     /// <param name="displayName">The display name for the local peer.</param>
-    /// <param name="certificateFingerprint">The SHA-256 fingerprint of the local TLS certificate.</param>
     /// <param name="identityKeyManager">The Ed25519 identity key manager for signing discovery broadcasts.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
         ushort tcpPort,
         ReadOnlyMemory<char> displayName,
-        ReadOnlyMemory<char> certificateFingerprint,
         IdentityKeyManager identityKeyManager,
         CancellationToken cancellationToken
     );
@@ -88,13 +86,6 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     /// <param name="ipAddress">The IP address of the peer.</param>
     /// <returns>The peer info, or null if not found.</returns>
     PeerInfo? GetPeerByIPAddress(IPAddress ipAddress);
-
-    /// <summary>
-    /// Looks up the expected certificate fingerprint for a peer by IP address.
-    /// </summary>
-    /// <param name="ipAddress">The IP address of the peer.</param>
-    /// <returns>The certificate fingerprint, or null if not found.</returns>
-    string? GetPeerFingerprintByIPAddress(IPAddress ipAddress);
 
     /// <summary>
     /// Looks up the display name for a peer by IP address.

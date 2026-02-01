@@ -60,24 +60,6 @@ public sealed class AppSettings
 public sealed class SecuritySettings
 {
     /// <summary>
-    /// The certificate file path.
-    /// </summary>
-    public string CertificatePath { get; set; } =
-        CertificateManager.DefaultCertificatePath;
-
-    /// <summary>
-    /// The certificate validity duration in years.
-    /// </summary>
-    public int CertificateValidityYears { get; set; } =
-        CertificateManager.DefaultValidityYears;
-
-    /// <summary>
-    /// The signing key file path.
-    /// </summary>
-    public string SigningKeyPath { get; set; } =
-        SigningKeyManager.DefaultSigningKeyPath;
-
-    /// <summary>
     /// The Ed25519 identity key file path.
     /// </summary>
     public string IdentityKeyPath { get; set; } =
@@ -95,22 +77,6 @@ public sealed class SecuritySettings
     /// </summary>
     public void Normalize()
     {
-        if (string.IsNullOrWhiteSpace(this.CertificatePath))
-        {
-            this.CertificatePath = CertificateManager.DefaultCertificatePath;
-        }
-
-        if (this.CertificateValidityYears <= 0)
-        {
-            this.CertificateValidityYears =
-                CertificateManager.DefaultValidityYears;
-        }
-
-        if (string.IsNullOrWhiteSpace(this.SigningKeyPath))
-        {
-            this.SigningKeyPath = SigningKeyManager.DefaultSigningKeyPath;
-        }
-
         if (string.IsNullOrWhiteSpace(this.IdentityKeyPath))
         {
             this.IdentityKeyPath = IdentityKeyManager.DefaultIdentityKeyPath;

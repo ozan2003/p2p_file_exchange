@@ -145,11 +145,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     private string m_displayName = string.Empty;
 
     /// <summary>
-    /// The local peer's certificate fingerprint.
-    /// </summary>
-    private string m_certificateFingerprint = string.Empty;
-
-    /// <summary>
     /// The local peer's TCP port for incoming connections.
     /// </summary>
     private ushort m_tcpPort;
@@ -203,7 +198,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     public async Task StartAsync(
         ushort tcpPort,
         ReadOnlyMemory<char> displayName,
-        ReadOnlyMemory<char> certificateFingerprint,
         IdentityKeyManager identityKeyManager,
         CancellationToken cancellationToken
     )
@@ -236,9 +230,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
             this.m_tcpPort = tcpPort;
             this.m_displayName = displayName.Trim().ToString();
-            this.m_certificateFingerprint = certificateFingerprint
-                .Trim()
-                .ToString();
             this.m_identityKeyManager = identityKeyManager;
 
             this.m_discoveryCts =
@@ -354,22 +345,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <inheritdoc />
-    public string? GetPeerFingerprintByIPAddress(IPAddress ipAddress)
-    {
-        if (ipAddress == null)
-        {
-            return null;
-        }
-
-        return this
-            .m_peers.Values.FirstOrDefault(peer =>
-                peer.IPAddress == ipAddress
-                && !string.IsNullOrWhiteSpace(peer.CertificateFingerprint)
-            )
-            ?.CertificateFingerprint;
-    }
-
-    /// <inheritdoc />
     public string? GetPeerDisplayNameByIPAddress(IPAddress ipAddress)
     {
         if (ipAddress == null)
@@ -404,37 +379,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             return "Unknown";
         }
         return name.Trim().ToString();
-    }
-
-    /// <summary>
-    /// Validates that a certificate fingerprint is a valid SHA-256 hex string (64 characters).
-    /// </summary>
-    /// <param name="fingerprint">The fingerprint to validate.</param>
-    /// <returns>True if the fingerprint is valid; otherwise, false.</returns>
-    private static bool IsValidCertificateFingerprint(
-        ReadOnlySpan<char> fingerprint
-    )
-    {
-        if (fingerprint.IsEmpty || MemoryExtensions.IsWhiteSpace(fingerprint))
-        {
-            return false;
-        }
-
-        // SHA-256 produces 32 bytes = 64 hex characters.
-        if (fingerprint.Length != 64)
-        {
-            return false;
-        }
-
-        // Verify all characters are valid hex digits.
-        foreach (char ch in fingerprint)
-        {
-            if (!char.IsAsciiHexDigit(ch))
-            {
-                return false;
-            }
-        }
-        return true;
     }
 
     /// <summary>
@@ -517,7 +461,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     displayName,
                     NetworkUtilities.GetPrimaryIPv4Address(),
                     this.m_tcpPort,
-                    this.m_certificateFingerprint,
                     this.m_identityKeyManager!.PublicKeyBase64,
                     timestamp,
                     nonceBase64
@@ -536,7 +479,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     DisplayName = displayName,
                     IPAddress = NetworkUtilities.GetPrimaryIPv4Address(),
                     TcpPort = this.m_tcpPort,
-                    CertificateFingerprint = this.m_certificateFingerprint,
                     PublicKey = this.m_identityKeyManager.PublicKeyBase64,
                     Timestamp = timestamp,
                     Nonce = nonceBase64,
@@ -602,16 +544,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 }
 
                 if (announcement.TcpPort == 0)
-                {
-                    continue;
-                }
-
-                // Ignore announcements without valid certificate fingerprint (SHA-256 = 64 hex chars).
-                if (
-                    !IsValidCertificateFingerprint(
-                        announcement.CertificateFingerprint
-                    )
-                )
                 {
                     continue;
                 }
@@ -685,11 +617,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         IPAddress = ipAddress,
                         TcpPort = announcement.TcpPort,
                         LastSeen = now,
-                        CertificateFingerprint =
-                            announcement.CertificateFingerprint ?? string.Empty,
-#pragma warning disable CS0618 // Keep for backward compatibility
-                        PublicKey = announcement.PublicKey ?? string.Empty,
-#pragma warning restore CS0618
                         IdentityPublicKey =
                             announcement.PublicKey ?? string.Empty,
                         IdentityFingerprint = identityFingerprint,
@@ -704,12 +631,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         existing.IPAddress = ipAddress;
                         existing.TcpPort = announcement.TcpPort;
                         // LastSeen is updated above in the dedup check.
-                        existing.CertificateFingerprint =
-                            announcement.CertificateFingerprint ?? string.Empty;
-#pragma warning disable CS0618
-                        existing.PublicKey =
-                            announcement.PublicKey ?? string.Empty;
-#pragma warning restore CS0618
                         // Identity fields are immutable after first trust
                         return existing;
                     }
@@ -839,7 +760,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 announcement.DisplayName,
                 announcement.IPAddress,
                 announcement.TcpPort,
-                announcement.CertificateFingerprint,
                 announcement.PublicKey,
                 announcement.Timestamp,
                 announcement.Nonce
@@ -879,7 +799,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         string displayName,
         IPAddress ipAddress,
         ushort tcpPort,
-        string certificateFingerprint,
         string publicKey,
         long timestamp,
         string nonce
@@ -887,7 +806,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     {
         SortedDictionary<string, object?> payload = new()
         {
-            ["certificateFingerprint"] = certificateFingerprint ?? string.Empty,
             ["displayName"] = displayName ?? string.Empty,
             ["ipAddress"] = ipAddress?.ToString() ?? string.Empty,
             ["nonce"] = nonce ?? string.Empty,
@@ -1028,9 +946,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
 
         [JsonPropertyName("tcpPort")]
         public ushort TcpPort { get; set; }
-
-        [JsonPropertyName("certificateFingerprint")]
-        public string CertificateFingerprint { get; set; } = string.Empty;
 
         /// <summary>
         /// Base64-encoded Ed25519 public key (32 bytes) for signature verification.
