@@ -1,0 +1,171 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="P2PFileExchange.Desktop.Views.PeerSecurityDetailsDialog"
+        Title="Peer Security Details"
+        Width="500"
+        Height="520"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="True">
+
+  <Border Padding="24">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+
+      <!-- Header -->
+      <StackPanel Grid.Row="0" Spacing="4" Margin="0,0,0,16">
+        <TextBlock x:Name="PeerNameText"
+                   FontSize="20"
+                   FontWeight="SemiBold" />
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Border x:Name="TrustBadge"
+                  CornerRadius="4"
+                  Padding="8,4">
+            <TextBlock x:Name="TrustLevelText"
+                       FontSize="12"
+                       FontWeight="SemiBold" />
+          </Border>
+        </StackPanel>
+      </StackPanel>
+
+      <!-- Public Key Fingerprint -->
+      <Border Grid.Row="1"
+              Background="{DynamicResource SystemControlBackgroundListLowBrush}"
+              CornerRadius="6"
+              Padding="16"
+              Margin="0,0,0,16">
+        <StackPanel Spacing="8">
+          <TextBlock Text="Public Key Fingerprint"
+                     FontSize="12"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+          <TextBlock x:Name="FingerprintText"
+                     FontFamily="Consolas,Monaco,monospace"
+                     FontSize="14"
+                     TextWrapping="Wrap"
+                     TextAlignment="Center"
+                     Margin="0,4" />
+          <TextBlock Text="Verify this fingerprint with the peer through a trusted channel."
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Statistics -->
+      <Border Grid.Row="2"
+              Background="{DynamicResource SystemControlBackgroundListLowBrush}"
+              CornerRadius="6"
+              Padding="16"
+              Margin="0,0,0,16">
+        <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" ColumnDefinitions="*,Auto">
+          <!-- First Seen -->
+          <TextBlock Grid.Row="0" Grid.Column="0"
+                     Text="First Seen"
+                     FontSize="13"
+                     Margin="0,0,0,8" />
+          <TextBlock x:Name="FirstSeenText"
+                     Grid.Row="0" Grid.Column="1"
+                     FontSize="13"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                     Margin="0,0,0,8" />
+
+          <!-- Last Seen -->
+          <TextBlock Grid.Row="1" Grid.Column="0"
+                     Text="Last Seen"
+                     FontSize="13"
+                     Margin="0,0,0,8" />
+          <TextBlock x:Name="LastSeenText"
+                     Grid.Row="1" Grid.Column="1"
+                     FontSize="13"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                     Margin="0,0,0,8" />
+
+          <!-- Successful Transfers -->
+          <TextBlock Grid.Row="2" Grid.Column="0"
+                     Text="Successful Transfers"
+                     FontSize="13"
+                     Margin="0,0,0,8" />
+          <TextBlock x:Name="TransferCountText"
+                     Grid.Row="2" Grid.Column="1"
+                     FontSize="13"
+                     Foreground="#FF44BB44"
+                     Margin="0,0,0,8" />
+
+          <!-- Failed Transfers -->
+          <TextBlock Grid.Row="3" Grid.Column="0"
+                     Text="Failed Transfers"
+                     FontSize="13"
+                     Margin="0,0,0,8" />
+          <TextBlock x:Name="FailedTransferCountText"
+                     Grid.Row="3" Grid.Column="1"
+                     FontSize="13"
+                     Foreground="#FFFF6666"
+                     Margin="0,0,0,8" />
+
+          <!-- Peer ID -->
+          <TextBlock Grid.Row="4" Grid.Column="0"
+                     Text="Peer ID"
+                     FontSize="13"
+                     Margin="0,0,0,8" />
+          <TextBlock x:Name="PeerIdText"
+                     Grid.Row="4" Grid.Column="1"
+                     FontSize="11"
+                     FontFamily="Consolas,Monaco,monospace"
+                     Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                     Margin="0,0,0,8" />
+
+          <!-- Notes -->
+          <TextBlock Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="2"
+                     Text="Notes"
+                     FontSize="13"
+                     Margin="0,8,0,4" />
+        </Grid>
+      </Border>
+
+      <!-- Notes TextBox -->
+      <TextBox x:Name="NotesTextBox"
+               Grid.Row="3"
+               Watermark="Add notes about this peer..."
+               AcceptsReturn="True"
+               Height="60"
+               TextWrapping="Wrap"
+               Margin="0,0,0,16" />
+
+      <!-- Buttons -->
+      <Grid Grid.Row="4" ColumnDefinitions="*,Auto">
+        <!-- Trust Actions -->
+        <StackPanel Grid.Column="0"
+                    Orientation="Horizontal"
+                    Spacing="8">
+          <Button x:Name="BlockButton"
+                  Content="Block"
+                  Width="80"
+                  Click="OnBlockClick"
+                  ToolTip.Tip="Block this peer from all connections" />
+          <Button x:Name="RemoveButton"
+                  Content="Remove"
+                  Width="80"
+                  Click="OnRemoveClick"
+                  ToolTip.Tip="Remove from trusted peers" />
+        </StackPanel>
+
+        <!-- Close/Save -->
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="8">
+          <Button x:Name="SaveButton"
+                  Content="Save"
+                  Width="80"
+                  Classes="accent"
+                  Click="OnSaveClick"
+                  ToolTip.Tip="Save notes and close" />
+          <Button x:Name="CloseButton"
+                  Content="Close"
+                  Width="80"
+                  Click="OnCloseClick" />
+        </StackPanel>
+      </Grid>
+
+    </Grid>
+  </Border>
+</Window>

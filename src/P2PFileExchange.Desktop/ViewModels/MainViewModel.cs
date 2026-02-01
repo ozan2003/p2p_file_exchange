@@ -4,10 +4,10 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Reactive;
 using System.Reactive.Linq;
-using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
@@ -17,6 +17,7 @@ using P2PFileExchange.Core.Services.Transfer;
 using P2PFileExchange.Core.Utilities;
 using P2PFileExchange.Desktop.Services;
 using P2PFileExchange.Desktop.Settings;
+using P2PFileExchange.Desktop.Views;
 using ReactiveUI;
 
 namespace P2PFileExchange.Desktop.ViewModels;
@@ -32,6 +33,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IPeerDiscoveryService m_peerDiscoveryService;
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
+    private readonly IPeerTrustService m_peerTrustService;
+    private readonly IWindowProvider m_windowProvider;
     private readonly AppSettings m_settings;
     private readonly IdentityKeyManager m_identityKeyManager;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
@@ -50,12 +53,16 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// <param name="peerDiscoveryService">The peer discovery service.</param>
     /// <param name="fileTransferService">The file transfer service.</param>
     /// <param name="fileDialogService">The file dialog service.</param>
+    /// <param name="peerTrustService">The peer trust service.</param>
+    /// <param name="windowProvider">The window provider.</param>
     /// <param name="settings">The application settings.</param>
     /// <param name="identityKeyManager">The identity key manager.</param>
     public MainViewModel(
         IPeerDiscoveryService peerDiscoveryService,
         IFileTransferService fileTransferService,
         IFileDialogService fileDialogService,
+        IPeerTrustService peerTrustService,
+        IWindowProvider windowProvider,
         AppSettings settings,
         IdentityKeyManager identityKeyManager
     )
@@ -63,6 +70,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService = peerDiscoveryService;
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
+        this.m_peerTrustService = peerTrustService;
+        this.m_windowProvider = windowProvider;
         this.m_settings = settings;
         this.m_identityKeyManager = identityKeyManager;
 
@@ -107,6 +116,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         peerDiscoveryService.PeerUpdated += this.OnPeerUpdated;
         peerDiscoveryService.PeerRemoved += this.OnPeerRemoved;
         peerDiscoveryService.StatusChanged += this.OnStatusChanged;
+
+        peerTrustService.NewPeerDetected += this.OnNewPeerDetected;
+        peerTrustService.KeyMismatchDetected += this.OnKeyMismatchDetected;
 
         fileTransferService.TransferRequestReceived +=
             this.OnTransferRequestReceived;
@@ -230,6 +242,11 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     {
         try
         {
+            // Initialize the peer trust database
+            await this
+                .m_peerTrustService.InitializeAsync()
+                .ConfigureAwait(false);
+
             // Initialize the TLS certificate for file transfers.
             SecuritySettings securitySettings = this.m_settings.Security;
             this.m_localCertificate = CertificateManager.GetOrCreateCertificate(
@@ -291,6 +308,10 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.m_peerDiscoveryService.PeerUpdated -= this.OnPeerUpdated;
         this.m_peerDiscoveryService.PeerRemoved -= this.OnPeerRemoved;
         this.m_peerDiscoveryService.StatusChanged -= this.OnStatusChanged;
+
+        this.m_peerTrustService.NewPeerDetected -= this.OnNewPeerDetected;
+        this.m_peerTrustService.KeyMismatchDetected -=
+            this.OnKeyMismatchDetected;
 
         this.m_fileTransferService.TransferRequestReceived -=
             this.OnTransferRequestReceived;
@@ -442,7 +463,32 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             PeerItemViewModel viewModel = new(peer);
             this.m_peerLookup[peer.PeerId] = viewModel;
             this.Peers.Add(viewModel);
+
+            // Verify trust status for new peers (fires events for dialogs if needed)
+            _ = this.VerifyPeerTrustAsync(peer);
         });
+    }
+
+    /// <summary>
+    /// Verifies the trust status of a discovered peer asynchronously.
+    /// </summary>
+    private async Task VerifyPeerTrustAsync(PeerInfo peer)
+    {
+        try
+        {
+            if (!this.m_peerTrustService.IsInitialized)
+            {
+                return;
+            }
+
+            _ = await this
+                .m_peerTrustService.VerifyPeerAsync(peer)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            this.SetStatusMessage($"Trust verification failed: {ex.Message}");
+        }
     }
 
     private void OnPeerRemoved(object? sender, Guid peerId)
@@ -653,6 +699,147 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         {
             this.IsDiscovering = isRunning;
             this.StatusMessage = message;
+        });
+    }
+
+    /// <summary>
+    /// Handles the NewPeerDetected event from the trust service.
+    /// Shows a dialog for the user to trust or reject the peer.
+    /// </summary>
+    private void OnNewPeerDetected(object? sender, NewPeerTrustEventArgs args)
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                Window? owner = this.m_windowProvider.MainWindow;
+
+                NewPeerDialog dialog = new();
+                dialog.SetContent(
+                    args.PeerId,
+                    args.DisplayName,
+                    args.Fingerprint,
+                    args.PublicKey
+                );
+
+                NewPeerDialogResult result = await dialog
+                    .ShowAndWaitAsync(owner)
+                    .ConfigureAwait(true);
+
+                switch (result)
+                {
+                    case NewPeerDialogResult.Trust:
+                        await this
+                            .m_peerTrustService.TrustNewPeerAsync(
+                                args.PeerId,
+                                args.DisplayName,
+                                args.PublicKey
+                            )
+                            .ConfigureAwait(true);
+                        this.SetStatusMessage(
+                            $"Trusted peer: {args.DisplayName}"
+                        );
+                        break;
+
+                    case NewPeerDialogResult.Block:
+                        await this
+                            .m_peerTrustService.BlockPeerAsync(
+                                args.PeerId,
+                                args.DisplayName,
+                                args.PublicKey,
+                                "Blocked on first contact"
+                            )
+                            .ConfigureAwait(true);
+                        this.SetStatusMessage(
+                            $"Blocked peer: {args.DisplayName}"
+                        );
+                        break;
+
+                    case NewPeerDialogResult.Reject:
+                    default:
+                        // Do nothing - peer remains unknown
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                this.SetStatusMessage($"Trust operation failed: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Handles the KeyMismatchDetected event from the trust service.
+    /// Shows a security warning dialog for the user to approve or reject the key change.
+    /// </summary>
+    private void OnKeyMismatchDetected(
+        object? sender,
+        KeyMismatchEventArgs args
+    )
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                Window? owner = this.m_windowProvider.MainWindow;
+
+                KeyMismatchDialog dialog = new();
+                dialog.SetContent(
+                    args.PeerId,
+                    args.DisplayName,
+                    args.OldFingerprint,
+                    args.NewFingerprint,
+                    args.NewPublicKey
+                );
+
+                KeyMismatchDialogResult result = await dialog
+                    .ShowAndWaitAsync(owner)
+                    .ConfigureAwait(true);
+
+                switch (result)
+                {
+                    case KeyMismatchDialogResult.Approve:
+                        await this
+                            .m_peerTrustService.ApproveKeyChangeAsync(
+                                args.PeerId,
+                                args.DisplayName,
+                                args.NewPublicKey
+                            )
+                            .ConfigureAwait(true);
+                        this.SetStatusMessage(
+                            $"Approved key change for: {args.DisplayName}"
+                        );
+                        break;
+
+                    case KeyMismatchDialogResult.Block:
+                        await this
+                            .m_peerTrustService.BlockPeerAsync(
+                                args.PeerId,
+                                args.DisplayName,
+                                args.NewPublicKey,
+                                "Blocked after key mismatch"
+                            )
+                            .ConfigureAwait(true);
+                        this.SetStatusMessage(
+                            $"Blocked peer due to key mismatch: {args.DisplayName}"
+                        );
+                        break;
+
+                    case KeyMismatchDialogResult.Reject:
+                    default:
+                        // Connection rejected but peer not blocked
+                        this.SetStatusMessage(
+                            $"Rejected connection from: {args.DisplayName}"
+                        );
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                this.SetStatusMessage(
+                    $"Key mismatch handling failed: {ex.Message}"
+                );
+            }
         });
     }
 }

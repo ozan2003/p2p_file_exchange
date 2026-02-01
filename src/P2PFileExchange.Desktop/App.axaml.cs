@@ -147,6 +147,7 @@ public partial class App : Application
         services.AddSingleton<IWindowProvider>(windowProvider);
         services.AddSingleton<IPasswordProvider>(passwordProvider);
         services.AddSingleton<IFileDialogService, FileDialogService>();
+        services.AddSingleton<IPeerTrustService, PeerTrustService>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SettingsViewModel>();
         return (services.BuildServiceProvider(), identityService);
@@ -189,6 +190,14 @@ public partial class App : Application
         if (transferService != null)
         {
             await transferService.StopListenerAsync().ConfigureAwait(false);
+        }
+
+        // Dispose peer trust service (closes SQLite databases)
+        IPeerTrustService? peerTrustService =
+            this.m_serviceProvider.GetService<IPeerTrustService>();
+        if (peerTrustService != null)
+        {
+            await peerTrustService.DisposeAsync().ConfigureAwait(false);
         }
 
         // Clear identity keys from memory

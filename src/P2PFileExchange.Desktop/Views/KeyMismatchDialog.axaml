@@ -1,0 +1,136 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="P2PFileExchange.Desktop.Views.KeyMismatchDialog"
+        Title="Security Warning"
+        Width="520"
+        Height="440"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="True"
+        Topmost="True">
+
+  <Border Padding="24">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
+
+      <!-- Header - Security Warning -->
+      <Border Grid.Row="0"
+              Background="#44FF4444"
+              CornerRadius="6"
+              Padding="16"
+              Margin="0,0,0,16">
+        <StackPanel Spacing="8">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="🚨" FontSize="20" VerticalAlignment="Center" />
+            <TextBlock Text="Key Mismatch Detected!"
+                       FontSize="18"
+                       FontWeight="Bold"
+                       Foreground="#FFFF4444"
+                       VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock x:Name="WarningText"
+                     TextWrapping="Wrap"
+                     FontSize="13" />
+        </StackPanel>
+      </Border>
+
+      <!-- Explanation -->
+      <TextBlock Grid.Row="1"
+                 Text="The public key for this peer has changed since you last connected. This could mean:"
+                 FontSize="13"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,8" />
+
+      <!-- Possible Reasons -->
+      <Border Grid.Row="2"
+              Background="{DynamicResource SystemControlBackgroundListLowBrush}"
+              CornerRadius="6"
+              Padding="16"
+              Margin="0,0,0,16">
+        <StackPanel Spacing="12">
+          <!-- Reason 1: Legitimate -->
+          <StackPanel Spacing="4">
+            <TextBlock Text="Legitimate reason:"
+                       FontWeight="SemiBold"
+                       FontSize="12" />
+            <TextBlock Text="• The peer reinstalled the application"
+                       FontSize="12"
+                       Margin="16,0,0,0" />
+            <TextBlock Text="• The peer switched devices"
+                       FontSize="12"
+                       Margin="16,0,0,0" />
+          </StackPanel>
+
+          <!-- Reason 2: Malicious -->
+          <StackPanel Spacing="4">
+            <TextBlock Text="Malicious reason:"
+                       FontWeight="SemiBold"
+                       FontSize="12"
+                       Foreground="#FFFF6666" />
+            <TextBlock Text="• Someone is impersonating this peer (MITM attack)"
+                       FontSize="12"
+                       Margin="16,0,0,0" />
+          </StackPanel>
+
+          <!-- Fingerprint Comparison -->
+          <Border Background="{DynamicResource SystemControlBackgroundChromeMediumBrush}"
+                  CornerRadius="4"
+                  Padding="12"
+                  Margin="0,8,0,0">
+            <StackPanel Spacing="8">
+              <StackPanel Spacing="2">
+                <TextBlock Text="Previously trusted fingerprint:"
+                           FontSize="11"
+                           Foreground="{DynamicResource SystemControlForegroundBaseMediumBrush}" />
+                <TextBlock x:Name="OldFingerprintText"
+                           FontFamily="Consolas,Monaco,monospace"
+                           FontSize="12"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+              <StackPanel Spacing="2">
+                <TextBlock Text="New fingerprint received:"
+                           FontSize="11"
+                           Foreground="#FFFF8888" />
+                <TextBlock x:Name="NewFingerprintText"
+                           FontFamily="Consolas,Monaco,monospace"
+                           FontSize="12"
+                           TextWrapping="Wrap"
+                           Foreground="#FFFF8888" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </Border>
+
+      <!-- Recommendation -->
+      <TextBlock Grid.Row="3"
+                 Text="Recommendation: Contact the peer through another channel to verify the new fingerprint before approving."
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 FontWeight="SemiBold"
+                 Margin="0,0,0,16" />
+
+      <!-- Buttons -->
+      <StackPanel Grid.Row="4"
+                  Orientation="Horizontal"
+                  HorizontalAlignment="Right"
+                  Spacing="12">
+        <Button x:Name="BlockButton"
+                Content="Block Peer"
+                Width="100"
+                Click="OnBlockClick"
+                ToolTip.Tip="Block this peer permanently" />
+        <Button x:Name="RejectButton"
+                Content="Reject"
+                Width="100"
+                Click="OnRejectClick"
+                ToolTip.Tip="Reject this connection attempt" />
+        <Button x:Name="ApproveButton"
+                Content="Approve Change"
+                Width="120"
+                Click="OnApproveClick"
+                ToolTip.Tip="Trust the new key (only if verified!)" />
+      </StackPanel>
+
+    </Grid>
+  </Border>
+</Window>
