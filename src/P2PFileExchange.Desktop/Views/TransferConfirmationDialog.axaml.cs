@@ -27,7 +27,11 @@ public partial class TransferConfirmationDialog : Window
     /// <param name="senderName">The display name of the sender.</param>
     /// <param name="fileName">The name of the file being sent.</param>
     /// <param name="fileSize">The size of the file in bytes.</param>
-    public void SetContent(string senderName, string fileName, long fileSize)
+    public void SetContent(
+        ReadOnlySpan<char> senderName,
+        ReadOnlySpan<char> fileName,
+        long fileSize
+    )
     {
         this.SenderText.Text = $"{senderName} wants to send you a file:";
         this.FileInfoText.Text = $"{fileName} ({FormatFileSize(fileSize)})";
