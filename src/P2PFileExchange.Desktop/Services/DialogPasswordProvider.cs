@@ -1,5 +1,7 @@
+using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using P2PFileExchange.Core.Services.Security;
 
 namespace P2PFileExchange.Desktop.Services;
@@ -26,19 +28,20 @@ public sealed class DialogPasswordProvider : IPasswordProvider
         CancellationToken cancellationToken = default
     )
     {
-        var dialog = new Views.PasswordDialog(
-            isNewPassword: false,
-            attemptsRemaining: attemptsRemaining
-        );
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dialog = new Views.PasswordDialog(
+                isNewPassword: false,
+                attemptsRemaining: attemptsRemaining
+            );
 
-        return await dialog
-            .ShowDialog<string?>(
+            return await dialog.ShowDialog<string?>(
                 this.m_windowProvider.MainWindow
-                    ?? throw new System.InvalidOperationException(
+                    ?? throw new InvalidOperationException(
                         "Main window is not available."
                     )
-            )
-            .ConfigureAwait(false);
+            );
+        });
     }
 
     /// <inheritdoc/>
@@ -46,19 +49,20 @@ public sealed class DialogPasswordProvider : IPasswordProvider
         CancellationToken cancellationToken = default
     )
     {
-        var dialog = new Views.PasswordDialog(
-            isNewPassword: true,
-            attemptsRemaining: null
-        );
+        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        {
+            var dialog = new Views.PasswordDialog(
+                isNewPassword: true,
+                attemptsRemaining: null
+            );
 
-        return await dialog
-            .ShowDialog<string?>(
+            return await dialog.ShowDialog<string?>(
                 this.m_windowProvider.MainWindow
-                    ?? throw new System.InvalidOperationException(
+                    ?? throw new InvalidOperationException(
                         "Main window is not available."
                     )
-            )
-            .ConfigureAwait(false);
+            );
+        });
     }
 
     /// <inheritdoc/>

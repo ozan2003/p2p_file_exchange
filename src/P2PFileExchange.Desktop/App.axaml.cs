@@ -52,6 +52,12 @@ public partial class App : Application
                 this.m_serviceProvider.GetRequiredService<IWindowProvider>();
             windowProvider.MainWindow = mainWindow;
 
+            // Show the main window and wait for it to be fully opened
+            TaskCompletionSource windowOpened = new();
+            mainWindow.Opened += (_, _) => windowOpened.TrySetResult();
+            mainWindow.Show();
+            await windowOpened.Task.ConfigureAwait(true);
+
             // Initialize identity key (prompts for password if needed)
             IdentityInitResult initResult = await identityService
                 .InitializeAsync()
