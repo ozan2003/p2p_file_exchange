@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -456,7 +457,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
                 // Create canonical JSON for signing (sorted keys, no signature field)
-                string canonicalJson = CreateCanonicalSigningJson(
+                string canonicalJson = this.CreateCanonicalSigningJson(
                     this.LocalPeerId,
                     displayName,
                     NetworkUtilities.GetPrimaryIPv4Address(),
@@ -755,7 +756,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             }
 
             // 5. Verify Ed25519 signature
-            string canonicalJson = CreateCanonicalSigningJson(
+            string canonicalJson = this.CreateCanonicalSigningJson(
                 announcement.PeerId,
                 announcement.DisplayName,
                 announcement.IPAddress,
@@ -794,7 +795,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <summary>
     /// Creates a canonical JSON string for signing, with sorted keys and no signature field.
     /// </summary>
-    private static string CreateCanonicalSigningJson(
+    private string CreateCanonicalSigningJson(
         Guid peerId,
         string displayName,
         IPAddress ipAddress,
@@ -804,18 +805,30 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         string nonce
     )
     {
-        SortedDictionary<string, object?> payload = new()
-        {
-            ["displayName"] = displayName ?? string.Empty,
-            ["ipAddress"] = ipAddress?.ToString() ?? string.Empty,
-            ["nonce"] = nonce ?? string.Empty,
-            ["peerId"] = peerId.ToString(),
-            ["publicKey"] = publicKey ?? string.Empty,
-            ["tcpPort"] = tcpPort,
-            ["timestamp"] = timestamp,
-        };
+        ArrayBufferWriter<byte> buffer = new(256);
+        using Utf8JsonWriter writer = new(
+            buffer,
+            new JsonWriterOptions
+            {
+                Encoder = this.m_jsonOptions.Encoder,
+                Indented = this.m_jsonOptions.WriteIndented,
+            }
+        );
 
-        return JsonSerializer.Serialize(payload, s_canonicalJsonOptions);
+        writer.WriteStartObject();
+
+        writer.WriteString(nameof(displayName), displayName);
+        writer.WriteString(nameof(ipAddress), ipAddress.ToString());
+        writer.WriteString(nameof(nonce), nonce);
+        writer.WriteString(nameof(peerId), peerId);
+        writer.WriteString(nameof(publicKey), publicKey);
+        writer.WriteNumber(nameof(tcpPort), tcpPort);
+        writer.WriteNumber(nameof(timestamp), timestamp);
+
+        writer.WriteEndObject();
+        writer.Flush();
+
+        return Encoding.UTF8.GetString(buffer.WrittenSpan);
     }
 
     /// <summary>
