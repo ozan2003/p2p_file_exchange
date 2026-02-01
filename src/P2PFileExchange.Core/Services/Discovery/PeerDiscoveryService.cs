@@ -889,51 +889,6 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <summary>
-    /// Escapes special characters in a JSON string value.
-    /// </summary>
-    private static string EscapeJsonString(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        var sb = new StringBuilder(value.Length);
-        foreach (char c in value)
-        {
-            switch (c)
-            {
-                case '\\':
-                    _ = sb.Append("\\\\");
-                    break;
-                case '"':
-                    _ = sb.Append("\\\"");
-                    break;
-                case '\n':
-                    _ = sb.Append("\\n");
-                    break;
-                case '\r':
-                    _ = sb.Append("\\r");
-                    break;
-                case '\t':
-                    _ = sb.Append("\\t");
-                    break;
-                default:
-                    if (c < ' ')
-                    {
-                        _ = sb.Append($"\\u{(int)c:X4}");
-                    }
-                    else
-                    {
-                        _ = sb.Append(c);
-                    }
-                    break;
-            }
-        }
-        return sb.ToString();
-    }
-
-    /// <summary>
     /// Computes a unique hash for a nonce to prevent replay attacks.
     /// </summary>
     private static string ComputeNonceHash(Guid peerId, string nonce)
