@@ -574,7 +574,7 @@ public sealed class SettingsViewModel : ReactiveObject
             && panel.Children[2] is StackPanel buttonPanel
         )
         {
-            foreach (var child in buttonPanel.Children)
+            foreach (Control child in buttonPanel.Children)
             {
                 if (child is Button button)
                 {

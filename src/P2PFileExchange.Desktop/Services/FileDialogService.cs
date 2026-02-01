@@ -1,4 +1,3 @@
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
@@ -42,9 +41,9 @@ public sealed class FileDialogService : IFileDialogService
             Title = "Select a file to send",
         };
 
-        System.Collections.Generic.IReadOnlyList<IStorageFile> files =
+        IReadOnlyList<IStorageFile> files =
             await window.StorageProvider.OpenFilePickerAsync(options);
-        IStorageFile? file = files.FirstOrDefault();
+        IStorageFile? file = files.Count > 0 ? files[0] : null;
         return file?.Path.LocalPath;
     }
 

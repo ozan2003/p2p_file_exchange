@@ -29,10 +29,7 @@ internal static class FileChunker
         int chunkSize = DefaultChunkSize
     )
     {
-        if (chunkSize <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(chunkSize));
-        }
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkSize);
 
         return (int)Math.Ceiling(fileSize / (double)chunkSize);
     }
