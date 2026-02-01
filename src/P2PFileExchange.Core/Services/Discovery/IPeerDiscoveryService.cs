@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
+using P2PFileExchange.Core.Services.Security;
 
 namespace P2PFileExchange.Core.Services.Discovery;
 
@@ -51,18 +51,18 @@ public interface IPeerDiscoveryService : IAsyncDisposable
     ushort BroadcastPort { get; }
 
     /// <summary>
-    /// Starts discovery with the provided TCP listener port, display name, certificate fingerprint, and signing key.
+    /// Starts discovery with the provided TCP listener port, display name, certificate fingerprint, and identity key manager.
     /// </summary>
     /// <param name="tcpPort">The TCP port used for file transfers.</param>
     /// <param name="displayName">The display name for the local peer.</param>
     /// <param name="certificateFingerprint">The SHA-256 fingerprint of the local TLS certificate.</param>
-    /// <param name="signingKey">The ECDSA P-256 keypair for signing discovery broadcasts.</param>
+    /// <param name="identityKeyManager">The Ed25519 identity key manager for signing discovery broadcasts.</param>
     /// <param name="cancellationToken">A cancellation token.</param>
     Task StartAsync(
         ushort tcpPort,
         ReadOnlyMemory<char> displayName,
         ReadOnlyMemory<char> certificateFingerprint,
-        ECDsa signingKey,
+        IdentityKeyManager identityKeyManager,
         CancellationToken cancellationToken
     );
 

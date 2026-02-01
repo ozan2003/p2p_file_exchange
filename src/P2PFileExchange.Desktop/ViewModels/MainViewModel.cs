@@ -33,13 +33,13 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     private readonly IFileTransferService m_fileTransferService;
     private readonly IFileDialogService m_fileDialogService;
     private readonly AppSettings m_settings;
+    private readonly IdentityKeyManager m_identityKeyManager;
     private readonly Dictionary<Guid, PeerItemViewModel> m_peerLookup = [];
     private readonly Dictionary<Guid, TransferItemViewModel> m_transferLookup =
     [];
 
     private X509Certificate2? m_localCertificate;
     private string m_localFingerprint = string.Empty;
-    private ECDsa? m_signingKey;
 
     private string m_displayName;
     private bool m_isDisposed;
@@ -50,17 +50,21 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
     /// <param name="peerDiscoveryService">The peer discovery service.</param>
     /// <param name="fileTransferService">The file transfer service.</param>
     /// <param name="fileDialogService">The file dialog service.</param>
+    /// <param name="settings">The application settings.</param>
+    /// <param name="identityKeyManager">The identity key manager.</param>
     public MainViewModel(
         IPeerDiscoveryService peerDiscoveryService,
         IFileTransferService fileTransferService,
         IFileDialogService fileDialogService,
-        AppSettings settings
+        AppSettings settings,
+        IdentityKeyManager identityKeyManager
     )
     {
         this.m_peerDiscoveryService = peerDiscoveryService;
         this.m_fileTransferService = fileTransferService;
         this.m_fileDialogService = fileDialogService;
         this.m_settings = settings;
+        this.m_identityKeyManager = identityKeyManager;
 
         this.m_displayName = string.Empty;
 
@@ -238,10 +242,14 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                     this.m_localCertificate
                 );
 
-            // Load or create the ECDSA signing key for discovery authentication.
-            this.m_signingKey = SigningKeyManager.GetOrCreateKeyPair(
-                securitySettings.SigningKeyPath
-            );
+            // Identity key is already loaded by IdentityService during app startup.
+            if (!this.m_identityKeyManager.IsLoaded)
+            {
+                this.SetStatusMessage(
+                    "Identity key not loaded. Restart the app."
+                );
+                return;
+            }
 
             string downloadDirectory = this.m_settings.DownloadDirectory;
             if (string.IsNullOrWhiteSpace(downloadDirectory))
@@ -298,7 +306,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
         this.SendFileCommand.Dispose();
 
         this.m_localCertificate?.Dispose();
-        this.m_signingKey?.Dispose();
+        // Note: m_identityKeyManager is managed by DI, not disposed here.
     }
 
     private static string SanitizeDisplayName(ReadOnlySpan<char> value)
@@ -325,11 +333,9 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
             return;
         }
 
-        if (this.m_signingKey == null)
+        if (!this.m_identityKeyManager.IsLoaded)
         {
-            this.SetStatusMessage(
-                "Signing key not initialized. Restart the app."
-            );
+            this.SetStatusMessage("Identity key not loaded. Restart the app.");
             return;
         }
 
@@ -341,7 +347,7 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                     this.m_fileTransferService.ListenerPort,
                     this.EffectiveDisplayName.AsMemory(),
                     this.m_localFingerprint.AsMemory(),
-                    this.m_signingKey,
+                    this.m_identityKeyManager,
                     CancellationToken.None
                 )
                 .ConfigureAwait(false);

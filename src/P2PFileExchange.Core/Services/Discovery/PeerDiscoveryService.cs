@@ -5,7 +5,10 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
@@ -34,6 +37,31 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     private static readonly TimeSpan s_deduplicationWindow =
         TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Maximum allowed clock skew for timestamp validation (30 seconds).
+    /// </summary>
+    private static readonly TimeSpan s_maxClockSkew = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// How long to retain nonces for replay protection (2 minutes).
+    /// </summary>
+    private static readonly TimeSpan s_nonceRetentionPeriod =
+        TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// Rate limit: maximum announcements per peer per minute.
+    /// </summary>
+    private const int MaxAnnouncementsPerMinute = 30;
+
+    /// <summary>
+    /// JSON serialization options for canonical signing.
+    /// </summary>
+    private static readonly JsonSerializerOptions s_canonicalJsonOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        WriteIndented = false,
+    };
     #endregion Constants
 
     #region Configuration
@@ -53,6 +81,20 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// Collection of discovered peers by their ID.
     /// </summary>
     private readonly ConcurrentDictionary<Guid, PeerInfo> m_peers = new();
+
+    /// <summary>
+    /// Seen nonces for replay protection: nonce hash -> expiration time.
+    /// </summary>
+    private readonly ConcurrentDictionary<string, DateTimeOffset> m_seenNonces =
+        new();
+
+    /// <summary>
+    /// Rate limiting: peer ID -> (window start, count).
+    /// </summary>
+    private readonly ConcurrentDictionary<
+        Guid,
+        (DateTimeOffset WindowStart, int Count)
+    > m_rateLimits = new();
     #endregion Peer State
 
     #region Synchronization
@@ -113,14 +155,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     private ushort m_tcpPort;
 
     /// <summary>
-    /// The local peer's ECDSA signing key.
+    /// The local peer's Ed25519 identity key manager.
     /// </summary>
-    private ECDsa? m_signingKey;
-
-    /// <summary>
-    /// The local peer's public key in Base64 format.
-    /// </summary>
-    private string m_localPublicKey = string.Empty;
+    private IdentityKeyManager? m_identityKeyManager;
     #endregion Local Identity
 
     /// <summary>
@@ -154,7 +191,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     public event EventHandler<string>? StatusChanged;
 
     /// <inheritdoc />
-    public Guid LocalPeerId { get; } = Guid.NewGuid();
+    public Guid LocalPeerId => this.m_identityKeyManager?.PeerId ?? Guid.Empty;
 
     /// <inheritdoc />
     public bool IsRunning { get; private set; }
@@ -167,7 +204,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         ushort tcpPort,
         ReadOnlyMemory<char> displayName,
         ReadOnlyMemory<char> certificateFingerprint,
-        ECDsa signingKey,
+        IdentityKeyManager identityKeyManager,
         CancellationToken cancellationToken
     )
     {
@@ -176,7 +213,16 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             throw new ArgumentOutOfRangeException(nameof(tcpPort));
         }
 
-        ArgumentNullException.ThrowIfNull(signingKey, nameof(signingKey));
+        ArgumentNullException.ThrowIfNull(
+            identityKeyManager,
+            nameof(identityKeyManager)
+        );
+        if (!identityKeyManager.IsLoaded)
+        {
+            throw new InvalidOperationException(
+                "Identity key must be loaded before starting discovery."
+            );
+        }
 
         await this
             .m_stateLock.WaitAsync(cancellationToken)
@@ -193,10 +239,7 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             this.m_certificateFingerprint = certificateFingerprint
                 .Trim()
                 .ToString();
-            this.m_signingKey = signingKey;
-            this.m_localPublicKey = SigningKeyManager.ExportPublicKey(
-                signingKey
-            );
+            this.m_identityKeyManager = identityKeyManager;
 
             this.m_discoveryCts =
                 CancellationTokenSource.CreateLinkedTokenSource(
@@ -447,23 +490,32 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
             {
                 string displayName = NormalizeDisplayName(this.m_displayName);
 
-                // Create the signature over the announcement data.
-                byte[] signingData =
-                    SigningKeyManager.CreateAnnouncementSigningData(
-                        this.LocalPeerId,
-                        displayName,
-                        this.m_tcpPort,
-                        this.m_certificateFingerprint
-                    );
+                // Generate a fresh nonce for replay protection
+                byte[] nonce = new byte[16];
+                RandomNumberGenerator.Fill(nonce);
+                string nonceBase64 = Convert.ToBase64String(nonce);
 
-                string signature = string.Empty;
-                if (this.m_signingKey != null)
-                {
-                    signature = SigningKeyManager.SignDataToBase64(
-                        this.m_signingKey,
-                        signingData
-                    );
-                }
+                // Current timestamp for freshness
+                long timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+                // Create canonical JSON for signing (sorted keys, no signature field)
+                string canonicalJson = CreateCanonicalSigningJson(
+                    this.LocalPeerId,
+                    displayName,
+                    NetworkUtilities.GetPrimaryIPv4Address(),
+                    this.m_tcpPort,
+                    this.m_certificateFingerprint,
+                    this.m_identityKeyManager!.PublicKeyBase64,
+                    timestamp,
+                    nonceBase64
+                );
+
+                // Sign using Ed25519
+                byte[] signingData = Encoding.UTF8.GetBytes(canonicalJson);
+                byte[] signatureBytes = this.m_identityKeyManager.Sign(
+                    signingData
+                );
+                string signature = Convert.ToBase64String(signatureBytes);
 
                 PeerAnnouncement announcement = new()
                 {
@@ -472,7 +524,9 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     IPAddress = NetworkUtilities.GetPrimaryIPv4Address(),
                     TcpPort = this.m_tcpPort,
                     CertificateFingerprint = this.m_certificateFingerprint,
-                    PublicKey = this.m_localPublicKey,
+                    PublicKey = this.m_identityKeyManager.PublicKeyBase64,
+                    Timestamp = timestamp,
+                    Nonce = nonceBase64,
                     Signature = signature,
                 };
 
@@ -549,12 +603,25 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     continue;
                 }
 
-                // Announcement signature is verified here.
-                if (!VerifyAnnouncementSignature(announcement))
+                // Rate limiting check
+                if (!this.CheckRateLimit(announcement.PeerId))
                 {
                     StatusChanged?.Invoke(
                         this,
-                        $"Invalid signature from peer {announcement.PeerId}: discarding announcement."
+                        $"Rate limit exceeded for peer {announcement.PeerId}: discarding announcement."
+                    );
+                    continue;
+                }
+
+                // Full verification: signature, timestamp, nonce, PeerId derivation, TOFU
+                (bool isValid, string? error) = this.VerifyAnnouncement(
+                    announcement
+                );
+                if (!isValid)
+                {
+                    StatusChanged?.Invoke(
+                        this,
+                        $"Invalid announcement from peer {announcement.PeerId}: {error}"
                     );
                     continue;
                 }
@@ -585,10 +652,17 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                     ipAddress = received.RemoteEndPoint.Address;
                 }
 
-                // Peers info is updated here.
+                // Decode the public key for storage
+                byte[] publicKeyBytes = Convert.FromBase64String(
+                    announcement.PublicKey
+                );
+                string identityFingerprint =
+                    IdentityKeyManager.ComputeFingerprint(publicKeyBytes);
+
+                // Peers info is updated here with TOFU support.
                 PeerInfo peerInfo = this.m_peers.AddOrUpdate(
                     announcement.PeerId,
-                    // Add a new peer if it doesn't exist.
+                    // Add a new peer if it doesn't exist (Trust-On-First-Use).
                     _ => new PeerInfo
                     {
                         PeerId = announcement.PeerId,
@@ -600,7 +674,14 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         LastSeen = now,
                         CertificateFingerprint =
                             announcement.CertificateFingerprint ?? string.Empty,
+#pragma warning disable CS0618 // Keep for backward compatibility
                         PublicKey = announcement.PublicKey ?? string.Empty,
+#pragma warning restore CS0618
+                        IdentityPublicKey =
+                            announcement.PublicKey ?? string.Empty,
+                        IdentityFingerprint = identityFingerprint,
+                        FirstTrusted = now,
+                        IsVerified = false, // TOFU: not yet verified by user
                     },
                     // Update existing peer info otherwise.
                     (_, existing) =>
@@ -613,8 +694,11 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                         // LastSeen is updated above in the dedup check.
                         existing.CertificateFingerprint =
                             announcement.CertificateFingerprint ?? string.Empty;
+#pragma warning disable CS0618
                         existing.PublicKey =
                             announcement.PublicKey ?? string.Empty;
+#pragma warning restore CS0618
+                        // Identity fields are immutable after first trust
                         return existing;
                     }
                 );
@@ -645,58 +729,257 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     }
 
     /// <summary>
-    /// Verifies the ECDSA signature on a peer announcement.
+    /// Verifies an announcement: signature, timestamp, nonce, PeerId derivation, and TOFU.
     /// </summary>
     /// <param name="announcement">The announcement to verify.</param>
-    /// <returns>True if the signature is valid; otherwise, false.</returns>
-    private static bool VerifyAnnouncementSignature(
+    /// <returns>A tuple containing success status and optional error message.</returns>
+    private (bool IsValid, string? Error) VerifyAnnouncement(
         PeerAnnouncement announcement
     )
     {
+        // Basic validation
         if (string.IsNullOrWhiteSpace(announcement.PublicKey))
         {
-            return false;
+            return (false, "Missing public key");
         }
 
         if (string.IsNullOrWhiteSpace(announcement.Signature))
         {
-            return false;
+            return (false, "Missing signature");
+        }
+
+        if (string.IsNullOrWhiteSpace(announcement.Nonce))
+        {
+            return (false, "Missing nonce");
         }
 
         try
         {
-            // Re-create the signing data from the announcement fields.
-            byte[] signingData =
-                SigningKeyManager.CreateAnnouncementSigningData(
-                    announcement.PeerId,
-                    announcement.DisplayName,
-                    announcement.TcpPort,
-                    announcement.CertificateFingerprint
-                );
-
-            // Re-import the public key and verify the signature.
-            using ECDsa publicKey = SigningKeyManager.ImportPublicKey(
+            // Decode public key
+            byte[] publicKeyBytes = Convert.FromBase64String(
                 announcement.PublicKey
             );
+            if (publicKeyBytes.Length != IdentityKeyManager.PublicKeyLength)
+            {
+                return (false, "Invalid public key length");
+            }
 
-            return SigningKeyManager.VerifySignatureFromBase64(
-                publicKey,
-                signingData,
-                announcement.Signature
+            // 1. Verify PeerId is derived from public key (cryptographic binding)
+            Guid derivedPeerId = IdentityKeyManager.ComputePeerId(
+                publicKeyBytes
             );
-        }
-        catch (CryptographicException)
-        {
-            return false;
+            if (derivedPeerId != announcement.PeerId)
+            {
+                return (false, "PeerId does not match public key");
+            }
+
+            // 2. Verify timestamp is within acceptable window
+            DateTimeOffset announcementTime =
+                DateTimeOffset.FromUnixTimeSeconds(announcement.Timestamp);
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            TimeSpan drift = now - announcementTime;
+            if (drift.Duration() > s_maxClockSkew)
+            {
+                return (
+                    false,
+                    $"Timestamp outside acceptable window (drift: {drift.TotalSeconds:F1}s)"
+                );
+            }
+
+            // 3. Check for replay (nonce reuse)
+            string nonceHash = ComputeNonceHash(
+                announcement.PeerId,
+                announcement.Nonce
+            );
+            DateTimeOffset nonceExpiration = now + s_nonceRetentionPeriod;
+            if (!this.m_seenNonces.TryAdd(nonceHash, nonceExpiration))
+            {
+                return (false, "Replay detected: nonce already used");
+            }
+
+            // 4. TOFU check: if we know this peer, ensure identity hasn't changed
+            if (
+                this.m_peers.TryGetValue(
+                    announcement.PeerId,
+                    out PeerInfo? existingPeer
+                )
+            )
+            {
+                if (
+                    !string.IsNullOrEmpty(existingPeer.IdentityPublicKey)
+                    && !string.Equals(
+                        existingPeer.IdentityPublicKey,
+                        announcement.PublicKey,
+                        StringComparison.Ordinal
+                    )
+                )
+                {
+                    return (
+                        false,
+                        "Identity key mismatch - possible impersonation attempt"
+                    );
+                }
+            }
+
+            // 5. Verify Ed25519 signature
+            string canonicalJson = CreateCanonicalSigningJson(
+                announcement.PeerId,
+                announcement.DisplayName,
+                announcement.IPAddress,
+                announcement.TcpPort,
+                announcement.CertificateFingerprint,
+                announcement.PublicKey,
+                announcement.Timestamp,
+                announcement.Nonce
+            );
+
+            byte[] signingData = Encoding.UTF8.GetBytes(canonicalJson);
+            byte[] signature = Convert.FromBase64String(announcement.Signature);
+
+            if (
+                !IdentityKeyManager.Verify(
+                    signingData,
+                    signature,
+                    publicKeyBytes
+                )
+            )
+            {
+                return (false, "Signature verification failed");
+            }
+
+            return (true, null);
         }
         catch (FormatException)
         {
-            return false;
+            return (false, "Invalid Base64 encoding");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"Verification error: {ex.Message}");
         }
     }
 
     /// <summary>
+    /// Creates a canonical JSON string for signing, with sorted keys and no signature field.
+    /// </summary>
+    private static string CreateCanonicalSigningJson(
+        Guid peerId,
+        string displayName,
+        IPAddress ipAddress,
+        ushort tcpPort,
+        string certificateFingerprint,
+        string publicKey,
+        long timestamp,
+        string nonce
+    )
+    {
+        SortedDictionary<string, object?> payload = new()
+        {
+            ["certificateFingerprint"] = certificateFingerprint ?? string.Empty,
+            ["displayName"] = displayName ?? string.Empty,
+            ["ipAddress"] = ipAddress?.ToString() ?? string.Empty,
+            ["nonce"] = nonce ?? string.Empty,
+            ["peerId"] = peerId.ToString(),
+            ["publicKey"] = publicKey ?? string.Empty,
+            ["tcpPort"] = tcpPort,
+            ["timestamp"] = timestamp,
+        };
+
+        return JsonSerializer.Serialize(payload, s_canonicalJsonOptions);
+    }
+
+    /// <summary>
+    /// Escapes special characters in a JSON string value.
+    /// </summary>
+    private static string EscapeJsonString(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var sb = new StringBuilder(value.Length);
+        foreach (char c in value)
+        {
+            switch (c)
+            {
+                case '\\':
+                    _ = sb.Append("\\\\");
+                    break;
+                case '"':
+                    _ = sb.Append("\\\"");
+                    break;
+                case '\n':
+                    _ = sb.Append("\\n");
+                    break;
+                case '\r':
+                    _ = sb.Append("\\r");
+                    break;
+                case '\t':
+                    _ = sb.Append("\\t");
+                    break;
+                default:
+                    if (c < ' ')
+                    {
+                        _ = sb.Append($"\\u{(int)c:X4}");
+                    }
+                    else
+                    {
+                        _ = sb.Append(c);
+                    }
+                    break;
+            }
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Computes a unique hash for a nonce to prevent replay attacks.
+    /// </summary>
+    private static string ComputeNonceHash(Guid peerId, string nonce)
+    {
+        byte[] data = Encoding.UTF8.GetBytes($"{peerId}:{nonce}");
+        byte[] hash = SHA256.HashData(data);
+        return Convert.ToHexString(hash);
+    }
+
+    /// <summary>
+    /// Checks if a peer is within rate limits.
+    /// </summary>
+    /// <param name="peerId">The peer ID to check.</param>
+    /// <returns>True if within limits, false if rate limited.</returns>
+    private bool CheckRateLimit(Guid peerId)
+    {
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        DateTimeOffset windowStart = now.AddMinutes(-1);
+
+        (DateTimeOffset WindowStart, int Count) current =
+            this.m_rateLimits.GetOrAdd(peerId, _ => (now, 0));
+
+        if (current.WindowStart < windowStart)
+        {
+            // Reset window
+            _ = this.m_rateLimits.TryUpdate(peerId, (now, 1), current);
+            return true;
+        }
+
+        if (current.Count >= MaxAnnouncementsPerMinute)
+        {
+            return false;
+        }
+
+        // Increment counter
+        _ = this.m_rateLimits.TryUpdate(
+            peerId,
+            (current.WindowStart, current.Count + 1),
+            current
+        );
+        return true;
+    }
+
+    /// <summary>
     /// Periodically removes stale peers that have not been seen within the timeout period.
+    /// Also cleans up expired nonces and rate limit entries.
     /// Runs at the configured cleanup interval until cancellation.
     /// </summary>
     /// <param name="cancellationToken">A token to signal loop termination.</param>
@@ -710,8 +993,10 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         )
         {
             cancellationToken.ThrowIfCancellationRequested();
-            DateTimeOffset expiration =
-                DateTimeOffset.UtcNow - this.m_options.PeerTimeout;
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            DateTimeOffset expiration = now - this.m_options.PeerTimeout;
+
+            // Clean up stale peers
             foreach ((Guid guid, PeerInfo peer) in this.m_peers)
             {
                 if (peer.LastSeen >= expiration)
@@ -722,6 +1007,35 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 if (this.m_peers.TryRemove(guid, out _))
                 {
                     PeerRemoved?.Invoke(this, guid);
+                }
+            }
+
+            // Clean up expired nonces
+            foreach (
+                (
+                    string nonceHash,
+                    DateTimeOffset nonceExpiration
+                ) in this.m_seenNonces
+            )
+            {
+                if (nonceExpiration < now)
+                {
+                    _ = this.m_seenNonces.TryRemove(nonceHash, out _);
+                }
+            }
+
+            // Clean up old rate limit entries
+            DateTimeOffset rateLimitExpiration = now.AddMinutes(-2);
+            foreach (
+                (
+                    Guid peerId,
+                    (DateTimeOffset WindowStart, int _) entry
+                ) in this.m_rateLimits
+            )
+            {
+                if (entry.WindowStart < rateLimitExpiration)
+                {
+                    _ = this.m_rateLimits.TryRemove(peerId, out _);
                 }
             }
         }
@@ -736,24 +1050,43 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// </summary>
     private sealed class PeerAnnouncement
     {
+        [JsonPropertyName("peerId")]
         public Guid PeerId { get; set; }
 
+        [JsonPropertyName("displayName")]
         public string DisplayName { get; set; } = string.Empty;
 
+        [JsonPropertyName("ipAddress")]
         public IPAddress IPAddress { get; set; } = IPAddress.None;
 
+        [JsonPropertyName("tcpPort")]
         public ushort TcpPort { get; set; }
 
+        [JsonPropertyName("certificateFingerprint")]
         public string CertificateFingerprint { get; set; } = string.Empty;
 
         /// <summary>
-        /// Base64-encoded ECDSA P-256 public key for signature verification.
+        /// Base64-encoded Ed25519 public key (32 bytes) for signature verification.
         /// </summary>
+        [JsonPropertyName("publicKey")]
         public string PublicKey { get; set; } = string.Empty;
 
         /// <summary>
-        /// Base64-encoded ECDSA signature over SHA256(PeerId + DisplayName + TcpPort + CertificateFingerprint).
+        /// Unix timestamp (seconds since epoch) for replay protection.
         /// </summary>
+        [JsonPropertyName("timestamp")]
+        public long Timestamp { get; set; }
+
+        /// <summary>
+        /// Base64-encoded random nonce (16 bytes) for replay protection.
+        /// </summary>
+        [JsonPropertyName("nonce")]
+        public string Nonce { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Base64-encoded Ed25519 signature (64 bytes) over canonical JSON of all other fields.
+        /// </summary>
+        [JsonPropertyName("signature")]
         public string Signature { get; set; } = string.Empty;
     }
 }
