@@ -3,7 +3,9 @@
         x:Class="P2PFileExchange.Desktop.Views.PeerSecurityDetailsDialog"
         Title="Peer Security Details"
         Width="500"
-        Height="520"
+        SizeToContent="Height"
+        MinHeight="480"
+        MaxHeight="700"
         WindowStartupLocation="CenterOwner"
         CanResize="False"
         ShowInTaskbar="True">

@@ -515,7 +515,9 @@ public sealed class SettingsViewModel : ReactiveObject
         {
             Title = "Regenerate Identity",
             Width = 450,
-            Height = 200,
+            SizeToContent = SizeToContent.Height,
+            MinHeight = 200,
+            MaxHeight = 400,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false,
             Content = new StackPanel
