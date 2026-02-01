@@ -128,9 +128,9 @@ public sealed class SettingsViewModel : ReactiveObject
     }
 
     /// <summary>
-    /// The TLS handshake timeout in seconds.
+    /// The handshake timeout in seconds.
     /// </summary>
-    public decimal TlsHandshakeTimeoutSeconds
+    public decimal HandshakeTimeoutSeconds
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
@@ -266,9 +266,9 @@ public sealed class SettingsViewModel : ReactiveObject
                     this.m_settings.Transfer.BufferSize / (double)BytesPerKiB
                 )
         );
-        this.TlsHandshakeTimeoutSeconds = Math.Max(
+        this.HandshakeTimeoutSeconds = Math.Max(
             1,
-            (int)this.m_settings.Transfer.TlsHandshakeTimeout.TotalSeconds
+            (int)this.m_settings.Transfer.HandshakeTimeout.TotalSeconds
         );
         this.TransferRequestTimeoutSeconds = Math.Max(
             1,
@@ -338,8 +338,8 @@ public sealed class SettingsViewModel : ReactiveObject
 
         this.m_settings.Transfer.ChunkSize = chunkSizeKiB * BytesPerKiB;
         this.m_settings.Transfer.BufferSize = bufferSizeKiB * BytesPerKiB;
-        this.m_settings.Transfer.TlsHandshakeTimeout = TimeSpan.FromSeconds(
-            (int)this.TlsHandshakeTimeoutSeconds
+        this.m_settings.Transfer.HandshakeTimeout = TimeSpan.FromSeconds(
+            (int)this.HandshakeTimeoutSeconds
         );
         this.m_settings.Transfer.TransferRequestTimeout = TimeSpan.FromSeconds(
             (int)this.TransferRequestTimeoutSeconds
@@ -393,8 +393,8 @@ public sealed class SettingsViewModel : ReactiveObject
             FileTransferOptions.DefaultChunkSize;
         this.m_settings.Transfer.BufferSize =
             FileTransferOptions.DefaultBufferSize;
-        this.m_settings.Transfer.TlsHandshakeTimeout =
-            FileTransferOptions.DefaultTlsHandshakeTimeout;
+        this.m_settings.Transfer.HandshakeTimeout =
+            FileTransferOptions.DefaultHandshakeTimeout;
         this.m_settings.Transfer.TransferRequestTimeout =
             FileTransferOptions.DefaultTransferRequestTimeout;
 

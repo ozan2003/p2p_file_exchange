@@ -18,11 +18,11 @@ namespace P2PFileExchange.Core.Services.Transfer;
 /// Provides TCP-based file transfer functionality.
 ///
 /// <list type="bullet">
-/// <item>Hosts a TCP listener and negotiates TLS with a local certificate.</item>
-/// <item>Sends files by connecting to a peer, performing TLS, sending metadata, then streaming chunks.</item>
-/// <item>Receives files by authenticating TLS, awaiting user approval, then writing chunks to disk.</item>
+/// <item>Hosts a TCP listener and establishes secure channels via X25519/ChaCha20-Poly1305.</item>
+/// <item>Sends files by connecting to a peer, performing a secure handshake, sending metadata, then streaming chunks.</item>
+/// <item>Receives files by completing the handshake, awaiting user approval, then writing chunks to disk.</item>
 /// <item>Validates chunk order and SHA-256 hashes, sanitizes file names, and cleans up partial files on failure.</item>
-/// <item>Supports certificate pinning via fingerprint lookups from peer discovery.</item>
+/// <item>Supports TOFU (Trust On First Use) via fingerprint lookups from peer discovery.</item>
 /// </list>
 /// </summary>
 public sealed class FileTransferService : IFileTransferService
@@ -374,7 +374,7 @@ public sealed class FileTransferService : IFileTransferService
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            handshakeTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
+            handshakeTimeoutCts.CancelAfter(this.m_options.HandshakeTimeout);
 
             await secureStream
                 .HandshakeAsync(
@@ -614,7 +614,7 @@ public sealed class FileTransferService : IFileTransferService
                 CancellationTokenSource.CreateLinkedTokenSource(
                     cancellationToken
                 );
-            handshakeTimeoutCts.CancelAfter(this.m_options.TlsHandshakeTimeout);
+            handshakeTimeoutCts.CancelAfter(this.m_options.HandshakeTimeout);
 
             await secureStream
                 .HandshakeAsync(

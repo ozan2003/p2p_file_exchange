@@ -98,7 +98,7 @@ The identity provides:
 
 ### Encrypted Transport
 
-All file transfers use a custom encrypted transport (`SecureP2PStream`) that replaces TLS:
+All file transfers use a custom encrypted transport:
 
 1. **X25519 key exchange** - Ephemeral keys provide forward secrecy
 2. **HKDF key derivation** - Separate TX/RX session keys

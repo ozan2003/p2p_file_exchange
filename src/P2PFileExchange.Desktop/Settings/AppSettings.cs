@@ -134,10 +134,10 @@ internal static class SettingsSanitizer
             options.BufferSize = FileTransferOptions.DefaultBufferSize;
         }
 
-        if (options.TlsHandshakeTimeout <= TimeSpan.Zero)
+        if (options.HandshakeTimeout <= TimeSpan.Zero)
         {
-            options.TlsHandshakeTimeout =
-                FileTransferOptions.DefaultTlsHandshakeTimeout;
+            options.HandshakeTimeout =
+                FileTransferOptions.DefaultHandshakeTimeout;
         }
 
         if (options.TransferRequestTimeout <= TimeSpan.Zero)

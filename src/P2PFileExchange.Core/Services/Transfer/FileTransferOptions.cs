@@ -13,9 +13,9 @@ public sealed class FileTransferOptions
     public const int DefaultBufferSize = 80 * 1024; // 80 KiB
 
     /// <summary>
-    /// The default TLS handshake timeout.
+    /// The default handshake timeout.
     /// </summary>
-    public static readonly TimeSpan DefaultTlsHandshakeTimeout =
+    public static readonly TimeSpan DefaultHandshakeTimeout =
         TimeSpan.FromSeconds(10);
 
     /// <summary>
@@ -40,10 +40,9 @@ public sealed class FileTransferOptions
     public int BufferSize { get; set; } = DefaultBufferSize;
 
     /// <summary>
-    /// The maximum duration allowed for TLS handshakes.
+    /// The maximum duration allowed for secure handshakes.
     /// </summary>
-    public TimeSpan TlsHandshakeTimeout { get; set; } =
-        DefaultTlsHandshakeTimeout;
+    public TimeSpan HandshakeTimeout { get; set; } = DefaultHandshakeTimeout;
 
     /// <summary>
     /// The maximum time to wait for a transfer request response.

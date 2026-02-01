@@ -13,8 +13,8 @@ namespace P2PFileExchange.Core.Services.Security;
 
 /// <summary>
 /// Provides an encrypted stream wrapper using X25519 key exchange, Ed25519 authentication,
-/// and ChaCha20-Poly1305 for symmetric encryption. Replaces TLS with a custom protocol
-/// that supports TOFU (Trust-On-First-Use) identity verification.
+/// and ChaCha20-Poly1305 for symmetric encryption. Supports TOFU (Trust-On-First-Use)
+/// identity verification.
 /// </summary>
 /// <remarks>
 /// Protocol:
@@ -77,12 +77,6 @@ public sealed class SecureP2PStream : Stream
     /// HKDF info string for session key derivation.
     /// </summary>
     private const string HkdfInfo = "P2PFileTransfer-v1-session";
-
-    /// <summary>
-    /// Default handshake timeout.
-    /// </summary>
-    private static readonly TimeSpan s_defaultHandshakeTimeout =
-        TimeSpan.FromSeconds(10);
 
     #endregion Constants
 
@@ -215,11 +209,6 @@ public sealed class SecureP2PStream : Stream
             throw new InvalidOperationException("Handshake already completed.");
         }
 
-        using CancellationTokenSource timeoutCts =
-            CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(s_defaultHandshakeTimeout);
-        CancellationToken token = timeoutCts.Token;
-
         try
         {
             // Step 1: Generate ephemeral X25519 keypair using Curve25519
@@ -235,11 +224,14 @@ public sealed class SecureP2PStream : Stream
                 if (isInitiator)
                 {
                     // Initiator sends first, then receives
-                    await this.WriteRawAsync(myEphemeralPublic, token)
+                    await this.WriteRawAsync(
+                            myEphemeralPublic,
+                            cancellationToken
+                        )
                         .ConfigureAwait(false);
                     theirEphemeralPublic = await this.ReadRawAsync(
                             X25519PublicKeyLength,
-                            token
+                            cancellationToken
                         )
                         .ConfigureAwait(false);
                 }
@@ -248,10 +240,13 @@ public sealed class SecureP2PStream : Stream
                     // Responder receives first, then sends
                     theirEphemeralPublic = await this.ReadRawAsync(
                             X25519PublicKeyLength,
-                            token
+                            cancellationToken
                         )
                         .ConfigureAwait(false);
-                    await this.WriteRawAsync(myEphemeralPublic, token)
+                    await this.WriteRawAsync(
+                            myEphemeralPublic,
+                            cancellationToken
+                        )
                         .ConfigureAwait(false);
                 }
 
@@ -361,12 +356,12 @@ public sealed class SecureP2PStream : Stream
                 // Exchange auth messages
                 if (isInitiator)
                 {
-                    await this.WriteRawAsync(myAuthMessage, token)
+                    await this.WriteRawAsync(myAuthMessage, cancellationToken)
                         .ConfigureAwait(false);
                     theirAuthMessage = await this.ReadRawAsync(
                             IdentityKeyManager.PublicKeyLength
                                 + Ed25519SignatureLength,
-                            token
+                            cancellationToken
                         )
                         .ConfigureAwait(false);
                 }
@@ -375,10 +370,10 @@ public sealed class SecureP2PStream : Stream
                     theirAuthMessage = await this.ReadRawAsync(
                             IdentityKeyManager.PublicKeyLength
                                 + Ed25519SignatureLength,
-                            token
+                            cancellationToken
                         )
                         .ConfigureAwait(false);
-                    await this.WriteRawAsync(myAuthMessage, token)
+                    await this.WriteRawAsync(myAuthMessage, cancellationToken)
                         .ConfigureAwait(false);
                 }
 
@@ -466,13 +461,10 @@ public sealed class SecureP2PStream : Stream
             }
         }
         catch (OperationCanceledException)
-            when (timeoutCts.IsCancellationRequested
-                && !cancellationToken.IsCancellationRequested
-            )
         {
             throw new SecureP2PException(
                 SecureP2PErrorCode.HandshakeTimeout,
-                "Handshake timed out."
+                "Handshake timed out or was canceled."
             );
         }
         catch (SecureP2PException)

@@ -18,18 +18,18 @@ flowchart LR
         B --> C[SHA-256 Hash]
         C --> D[SecureP2PStream]
     end
-    
+
     subgraph Network
         D --> E[TCP + Encryption]
     end
-    
+
     subgraph Receiver
         E --> F[SecureP2PStream]
         F --> G[Verify Hash]
         G --> H[Write Chunk]
         H --> I[File]
     end
-    
+
     style E fill:#4dabf7,stroke:#1971c2
 ```
 
@@ -40,11 +40,11 @@ sequenceDiagram
     participant S as Sender
     participant TCP as TCP Connection
     participant R as Receiver
-    
+
     Note over S,R: Step 1: Connection
     S->>TCP: Connect to receiver:port
     TCP->>R: Accept connection
-    
+
     Note over S,R: Step 2: SecureP2PStream Handshake
     S->>R: X25519 ephemeral public key
     R->>S: X25519 ephemeral public key
@@ -52,11 +52,11 @@ sequenceDiagram
     S->>R: Ed25519 identity + signature
     R->>S: Ed25519 identity + signature
     Note over S,R: TOFU verification complete
-    
+
     Note over S,R: Step 3: Metadata Exchange
     S->>R: FileMetadata (encrypted)
     R->>R: Prompt user for approval
-    
+
     alt User Accepts
         R->>S: TransferResponse.Accepted
         Note over S,R: Step 4: Chunk Transfer
@@ -88,13 +88,13 @@ classDiagram
         +int TotalChunksNumber
         +int ChunkSize
     }
-    
+
     class TransferResponse {
         <<enumeration>>
         Accepted
         Rejected
     }
-    
+
     class FileChunk {
         +int ChunkIndex
         +byte[] Data
@@ -162,12 +162,12 @@ Files are split into fixed-size chunks for streaming transfer:
 ```mermaid
 flowchart LR
     subgraph "File (1 MB)"
-        A[Chunk 0<br>256 KB] 
+        A[Chunk 0<br>256 KB]
         B[Chunk 1<br>256 KB]
         C[Chunk 2<br>256 KB]
         D[Chunk 3<br>256 KB]
     end
-    
+
     A --> |Hash + Send| E[Network]
     B --> |Hash + Send| E
     C --> |Hash + Send| E
@@ -201,7 +201,7 @@ flowchart TD
     D -->|Yes| E[Write to Disk]
     D -->|No| F[Abort Transfer]
     F --> G[Delete Partial File]
-    
+
     style F fill:#ff6b6b,color:#fff
     style E fill:#51cf66,color:#fff
 ```
@@ -257,7 +257,7 @@ flowchart TD
     B -->|User Canceled| E[Cleanup Partial File]
     B -->|Handshake Failed| F[No File Created]
     B -->|Identity Mismatch| G[No File Created]
-    
+
     C --> H[TransferFailed Event]
     D --> H
     E --> H
@@ -303,11 +303,11 @@ stateDiagram-v2
     AwaitingResponse --> Failed: Response = Rejected
     SendingChunks --> SendingChunks: Send next chunk
     SendingChunks --> Completed: All chunks sent
-    
+
     Connecting --> Failed: Connection error
     Handshaking --> Failed: Auth failed
     SendingChunks --> Failed: Network error
-    
+
     Completed --> [*]
     Failed --> [*]
 ```
@@ -325,10 +325,10 @@ stateDiagram-v2
     AwaitingApproval --> Rejected: User rejects
     ReceivingChunks --> ReceivingChunks: Receive & verify chunk
     ReceivingChunks --> Completed: All chunks received
-    
+
     Handshaking --> Failed: Auth failed / Identity mismatch
     ReceivingChunks --> Failed: Hash mismatch / Network error
-    
+
     Completed --> Listening
     Rejected --> Listening
     Failed --> Listening
@@ -343,7 +343,7 @@ public sealed class FileTransferOptions
 {
     public int ChunkSize { get; set; } = 256 * 1024;      // 256 KB
     public int BufferSize { get; set; } = 64 * 1024;      // 64 KB
-    public TimeSpan TlsHandshakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan HandshakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
 }
 ```
 
@@ -391,34 +391,34 @@ sequenceDiagram
     participant STS as Sender TransferService
     participant SS as SecureP2PStream
     participant TCP as TCP
-    participant RS as SecureP2PStream  
+    participant RS as SecureP2PStream
     participant RTS as Receiver TransferService
     participant RUI as Receiver UI
-    
+
     Note over SUI,RUI: User drags file to send
     SUI->>STS: SendFileAsync(filePath, peer)
     STS->>TCP: Connect to peer
     TCP->>RTS: Accept connection
-    
+
     Note over SUI,RUI: Handshake
     STS->>SS: Create SecureP2PStream
     RTS->>RS: Create SecureP2PStream
     SS->>RS: X25519 + Ed25519 exchange
-    
+
     Note over SUI,RUI: Metadata
     STS->>SS: WriteMetadataAsync
     SS->>RS: Encrypted metadata
     RS->>RTS: FileMetadata
     RTS->>RUI: TransferRequestReceived
     RUI->>RUI: Show confirmation dialog
-    
+
     Note over SUI,RUI: User decision
     RUI->>RTS: RespondToTransferRequest(Accept)
     RTS->>RS: WriteResponseAsync(Accepted)
     RS->>SS: Encrypted response
     SS->>STS: TransferResponse.Accepted
     STS->>SUI: TransferStarted
-    
+
     Note over SUI,RUI: Chunk transfer
     loop For each chunk
         STS->>STS: Read chunk + SHA-256
@@ -430,7 +430,7 @@ sequenceDiagram
         RTS->>RUI: TransferProgressChanged
         STS->>SUI: TransferProgressChanged
     end
-    
+
     Note over SUI,RUI: Complete
     STS->>SUI: TransferCompleted
     RTS->>RUI: TransferCompleted
