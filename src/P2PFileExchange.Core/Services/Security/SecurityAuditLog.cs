@@ -100,7 +100,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
 
     #region Fields
 
-    private readonly string m_databasePath;
     private readonly int m_retentionDays;
     private readonly SemaphoreSlim m_dbLock = new(1, 1);
     private SqliteConnection? m_connection;
@@ -125,7 +124,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         int retentionDays = DefaultRetentionDays
     )
     {
-        this.m_databasePath = databasePath ?? DefaultAuditLogPath;
+        this.DatabasePath = databasePath ?? DefaultAuditLogPath;
         this.m_retentionDays = retentionDays;
     }
 
@@ -154,7 +153,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
     /// <summary>
     /// Gets the path to the database file.
     /// </summary>
-    public string DatabasePath => this.m_databasePath;
+    public string DatabasePath { get; }
 
     /// <summary>
     /// Gets whether the audit log has been initialized.
@@ -184,7 +183,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             }
 
             // Ensure directory exists
-            string? directory = Path.GetDirectoryName(this.m_databasePath);
+            string? directory = Path.GetDirectoryName(this.DatabasePath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -193,7 +192,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             // Create and open connection
             string connectionString = new SqliteConnectionStringBuilder
             {
-                DataSource = this.m_databasePath,
+                DataSource = this.DatabasePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
                 Cache = SqliteCacheMode.Shared,
             }.ToString();

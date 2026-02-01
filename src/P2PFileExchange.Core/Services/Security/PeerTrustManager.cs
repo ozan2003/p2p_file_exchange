@@ -37,7 +37,6 @@ public sealed class PeerTrustManager : IAsyncDisposable
 
     #region Fields
 
-    private readonly string m_databasePath;
     private readonly SemaphoreSlim m_dbLock = new(1, 1);
     private SqliteConnection? m_connection;
     private bool m_disposed;
@@ -55,7 +54,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
     /// </param>
     public PeerTrustManager(string? databasePath = null)
     {
-        this.m_databasePath = databasePath ?? DefaultDatabasePath;
+        this.DatabasePath = databasePath ?? DefaultDatabasePath;
     }
 
     #endregion Constructor
@@ -85,7 +84,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
     /// <summary>
     /// Gets the path to the database file.
     /// </summary>
-    public string DatabasePath => this.m_databasePath;
+    public string DatabasePath { get; }
 
     /// <summary>
     /// Gets whether the database has been initialized.
@@ -115,7 +114,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
             }
 
             // Ensure directory exists
-            string? directory = Path.GetDirectoryName(this.m_databasePath);
+            string? directory = Path.GetDirectoryName(this.DatabasePath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -124,7 +123,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
             // Create and open connection
             string connectionString = new SqliteConnectionStringBuilder
             {
-                DataSource = this.m_databasePath,
+                DataSource = this.DatabasePath,
                 Mode = SqliteOpenMode.ReadWriteCreate,
                 Cache = SqliteCacheMode.Shared,
             }.ToString();
