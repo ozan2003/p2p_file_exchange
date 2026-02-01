@@ -6,7 +6,7 @@
 [![Last Commit](https://img.shields.io/github/last-commit/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange/commits/master)
 [![Code Size](https://img.shields.io/github/languages/code-size/ozan2003/p2p_file_exchange)](https://github.com/ozan2003/p2p_file_exchange)
 
-Peer-to-peer file transfer app for local networks. Discovers peers via Ed25519-signed UDP broadcasts and transfers files over encrypted TCP connections using X25519 key exchange and ChaCha20-Poly1305 encryption, all through a cross-platform desktop UI built with Avalonia.
+Simple peer-to-peer file sharing for your local network. Run it on two devices on the same Wi‑Fi/LAN, it finds other peers automatically, and can send files through a cross‑platform desktop app.
 
 > [!WARNING]
 > This app is not audited for security. Do not use it to transfer sensitive files
