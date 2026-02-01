@@ -20,6 +20,12 @@ namespace P2PFileExchange.Desktop;
 /// </summary>
 public partial class App : Application
 {
+    /// <summary>Default width for error dialogs.</summary>
+    private const int ErrorDialogWidth = 400;
+
+    /// <summary>Default height for error dialogs.</summary>
+    private const int ErrorDialogHeight = 150;
+
     private ServiceProvider? m_serviceProvider;
 
     public override void Initialize()
@@ -80,8 +86,8 @@ public partial class App : Application
                 var errorDialog = new Window
                 {
                     Title = "Identity Key Error",
-                    Width = 400,
-                    Height = 150,
+                    Width = ErrorDialogWidth,
+                    Height = ErrorDialogHeight,
                     WindowStartupLocation = WindowStartupLocation.CenterScreen,
                     Content = new TextBlock
                     {

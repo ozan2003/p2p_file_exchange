@@ -10,6 +10,15 @@ namespace P2PFileExchange.Desktop.ViewModels;
 /// </summary>
 public sealed class PeerItemViewModel : ReactiveObject
 {
+    /// <summary>Threshold in seconds for "just now" display.</summary>
+    private const int JustNowThresholdSeconds = 5;
+
+    /// <summary>Threshold in seconds before switching to minutes display.</summary>
+    private const int SecondsThresholdSeconds = 60;
+
+    /// <summary>Threshold in minutes before switching to hours display.</summary>
+    private const int MinutesThresholdMinutes = 60;
+
     private string m_displayName;
     private IPAddress m_ipAddress;
     private ushort m_tcpPort;
@@ -122,17 +131,17 @@ public sealed class PeerItemViewModel : ReactiveObject
     {
         TimeSpan elapsed = DateTimeOffset.UtcNow - lastSeen;
 
-        if (elapsed.TotalSeconds < 5)
+        if (elapsed.TotalSeconds < JustNowThresholdSeconds)
         {
             return "just now";
         }
 
-        if (elapsed.TotalSeconds < 60)
+        if (elapsed.TotalSeconds < SecondsThresholdSeconds)
         {
             return $"{(int)elapsed.TotalSeconds}s ago";
         }
 
-        if (elapsed.TotalMinutes < 60)
+        if (elapsed.TotalMinutes < MinutesThresholdMinutes)
         {
             return $"{(int)elapsed.TotalMinutes}m ago";
         }

@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using P2PFileExchange.Core.Services.Security;
 
 namespace P2PFileExchange.Desktop.Views;
 
@@ -8,6 +9,11 @@ namespace P2PFileExchange.Desktop.Views;
 /// </summary>
 public partial class PasswordDialog : Window
 {
+    /// <summary>
+    /// Minimum password length for identity key protection.
+    /// </summary>
+    private const int MinPasswordLength = 3;
+
     private readonly bool m_isNewPassword;
     private readonly int? m_attemptsRemaining;
 
@@ -29,7 +35,7 @@ public partial class PasswordDialog : Window
     /// Parameterless constructor for XAML designer.
     /// </summary>
     public PasswordDialog()
-        : this(false, 3) { }
+        : this(false, IdentityKeyManager.MaxPasswordAttempts) { }
 
     private void ConfigureDialog()
     {
@@ -48,7 +54,8 @@ public partial class PasswordDialog : Window
 
             if (
                 this.m_attemptsRemaining.HasValue
-                && this.m_attemptsRemaining.Value < 3
+                && this.m_attemptsRemaining.Value
+                    < IdentityKeyManager.MaxPasswordAttempts
             )
             {
                 this.DescriptionText.Text =
@@ -81,9 +88,11 @@ public partial class PasswordDialog : Window
 
         if (this.m_isNewPassword)
         {
-            if (password.Length < 8)
+            if (password.Length < MinPasswordLength)
             {
-                this.ShowError("Password must be at least 8 characters.");
+                this.ShowError(
+                    $"Password must be at least {MinPasswordLength} characters."
+                );
                 return;
             }
 
