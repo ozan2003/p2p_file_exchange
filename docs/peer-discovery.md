@@ -224,8 +224,10 @@ Per-Peer Rate Limit:
 
 ### Timestamp Validation
 
+Valid if:
+
 ```math
-Valid if: |local_time - announcement_time| \leq 30 \text{ seconds}
+|local\_time - announcement\_time| \leq 30 \text{ seconds}
 ```
 
 This prevents attackers from replaying old captured announcements.
