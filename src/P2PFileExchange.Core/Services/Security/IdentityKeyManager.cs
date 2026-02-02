@@ -79,7 +79,7 @@ public sealed class IdentityKeyManager : IDisposable
 
     private byte[]? m_publicKey;
     private byte[]? m_privateKey;
-    private bool m_disposed;
+    private bool m_isDisposed;
 
     /// <summary>
     /// Gets the default path for the identity key file.
@@ -811,19 +811,19 @@ public sealed class IdentityKeyManager : IDisposable
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(this.m_disposed, this);
+        ObjectDisposedException.ThrowIf(this.m_isDisposed, this);
     }
 
     /// <inheritdoc/>
     public void Dispose()
     {
-        if (this.m_disposed)
+        if (this.m_isDisposed)
         {
             return;
         }
 
         this.ClearKeys();
-        this.m_disposed = true;
+        this.m_isDisposed = true;
     }
 }
 
