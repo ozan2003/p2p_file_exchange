@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
+using P2PFileExchange.Core.Utilities;
 using Sodium;
 
 namespace P2PFileExchange.Core.Services.Security;
@@ -76,7 +77,8 @@ public sealed class SecureP2PStream : Stream
     /// <summary>
     /// HKDF info string for session key derivation.
     /// </summary>
-    private const string HkdfInfo = "P2PFileTransfer-v1-session";
+    private const string HkdfInfo =
+        $"{AppConstants.AppDataDirectoryName}-v1-session";
 
     #endregion Constants
 
@@ -90,7 +92,7 @@ public sealed class SecureP2PStream : Stream
     private byte[]? m_rxKey;
     private ulong m_txFrameNumber;
     private ulong m_rxExpectedFrameNumber;
-    private bool m_disposed;
+    private bool m_isDisposed;
 
     // Read buffering for partial frame reads
     private byte[]? m_readBuffer;
@@ -106,7 +108,7 @@ public sealed class SecureP2PStream : Stream
     /// </summary>
     /// <param name="baseStream">The underlying network stream.</param>
     /// <param name="localIdentity">The local identity key manager (must be loaded).</param>
-    /// <param name="leaveOpen">Whether to leave the base stream open when disposing.</param>
+    /// <param name="leaveOpen">Whether to leave the base stream open when isDisposing.</param>
     /// <exception cref="ArgumentNullException">Thrown if arguments are null.</exception>
     /// <exception cref="InvalidOperationException">Thrown if identity key is not loaded.</exception>
     public SecureP2PStream(
@@ -295,19 +297,22 @@ public sealed class SecureP2PStream : Stream
                 }
 
                 // Derive TX and RX keys (64 bytes total, split into two 32-byte keys)
-                byte[] derivedKeys = DeriveSessionKeys(sharedSecret, salt);
+                (byte[] TxKey, byte[] RxKey) = DeriveSessionKeys(
+                    sharedSecret,
+                    salt
+                );
 
                 // Assign keys based on role (ensures each direction uses different key)
                 if (isInitiator)
                 {
-                    this.m_txKey = derivedKeys[..SessionKeyLength];
-                    this.m_rxKey = derivedKeys[SessionKeyLength..];
+                    this.m_txKey = TxKey;
+                    this.m_rxKey = RxKey;
                 }
                 else
                 {
                     // Responder uses reversed assignment
-                    this.m_rxKey = derivedKeys[..SessionKeyLength];
-                    this.m_txKey = derivedKeys[SessionKeyLength..];
+                    this.m_rxKey = TxKey;
+                    this.m_txKey = RxKey;
                 }
 
                 // Step 5: Mutual authentication with Ed25519 signatures
@@ -484,7 +489,10 @@ public sealed class SecureP2PStream : Stream
     /// <summary>
     /// Derives session keys from the shared secret using HKDF-SHA256.
     /// </summary>
-    private static byte[] DeriveSessionKeys(byte[] sharedSecret, byte[] salt)
+    private static (byte[] TxKey, byte[] RxKey) DeriveSessionKeys(
+        byte[] sharedSecret,
+        byte[] salt
+    )
     {
         byte[] info = System.Text.Encoding.UTF8.GetBytes(HkdfInfo);
         byte[] derivedKeys = new byte[SessionKeyLength * 2]; // TX + RX keys
@@ -498,7 +506,10 @@ public sealed class SecureP2PStream : Stream
             info
         );
 
-        return derivedKeys;
+        byte[] txKey = derivedKeys[..SessionKeyLength];
+        byte[] rxKey = derivedKeys[SessionKeyLength..];
+
+        return (txKey, rxKey);
     }
 
     #endregion Handshake
@@ -981,7 +992,7 @@ public sealed class SecureP2PStream : Stream
 
     private void ThrowIfDisposed()
     {
-        ObjectDisposedException.ThrowIf(this.m_disposed, this);
+        ObjectDisposedException.ThrowIf(this.m_isDisposed, this);
     }
 
     private void ThrowIfNotHandshaked()
@@ -999,14 +1010,14 @@ public sealed class SecureP2PStream : Stream
     #region Disposal
 
     /// <inheritdoc />
-    protected override void Dispose(bool disposing)
+    protected override void Dispose(bool isDisposing)
     {
-        if (this.m_disposed)
+        if (this.m_isDisposed)
         {
             return;
         }
 
-        if (disposing)
+        if (isDisposing)
         {
             // Clear sensitive key material
             if (this.m_txKey is not null)
@@ -1024,14 +1035,14 @@ public sealed class SecureP2PStream : Stream
             }
         }
 
-        this.m_disposed = true;
-        base.Dispose(disposing);
+        this.m_isDisposed = true;
+        base.Dispose(isDisposing);
     }
 
     /// <inheritdoc />
     public override async ValueTask DisposeAsync()
     {
-        if (this.m_disposed)
+        if (this.m_isDisposed)
         {
             return;
         }
@@ -1051,7 +1062,7 @@ public sealed class SecureP2PStream : Stream
             await this.m_baseStream.DisposeAsync().ConfigureAwait(false);
         }
 
-        this.m_disposed = true;
+        this.m_isDisposed = true;
         GC.SuppressFinalize(this);
     }
 
