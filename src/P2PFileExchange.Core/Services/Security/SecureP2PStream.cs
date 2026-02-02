@@ -4,6 +4,7 @@ using System.IO;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
@@ -489,12 +490,12 @@ public sealed class SecureP2PStream : Stream
     /// <summary>
     /// Derives session keys from the shared secret using HKDF-SHA256.
     /// </summary>
-    private static (byte[] TxKey, byte[] RxKey) DeriveSessionKeys(
-        byte[] sharedSecret,
-        byte[] salt
+    private static (byte[] txKey, byte[] rxKey) DeriveSessionKeys(
+        ReadOnlySpan<byte> sharedSecret,
+        ReadOnlySpan<byte> salt
     )
     {
-        byte[] info = System.Text.Encoding.UTF8.GetBytes(HkdfInfo);
+        byte[] info = Encoding.UTF8.GetBytes(HkdfInfo);
         byte[] derivedKeys = new byte[SessionKeyLength * 2]; // TX + RX keys
 
         // Use HKDF to derive the session keys
