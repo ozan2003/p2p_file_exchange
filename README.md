@@ -65,75 +65,9 @@ Inbound files are saved to:
 > If discovery or transfers do not work, ensure UDP broadcast and TCP traffic
 > are allowed by your firewall.
 
-## Security
-
-### Architecture Overview
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                    Security Layers                          │
-├─────────────────────────────────────────────────────────────┤
-│  Identity      │  Ed25519 persistent keypair                │
-│  Key Exchange  │  X25519 ephemeral keys (forward secrecy)   │
-│  Encryption    │  ChaCha20-Poly1305 AEAD                    │
-│  Trust Model   │  TOFU with SQLite-backed database          │
-│  Integrity     │  SHA-256 per-chunk verification            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Identity Keys
-
-On first run, an Ed25519 identity keypair is generated and encrypted at rest using Argon2id key derivation:
-
-```text
-~/.local/share/P2PFileExchange/identity.key    (Linux)
-%LOCALAPPDATA%\P2PFileExchange\identity.key    (Windows)
-```
-
-The identity provides:
-
-- **Peer ID**: Derived from SHA-256 of the public key
-- **Fingerprint**: Human-readable hash for verification
-- **Signatures**: For discovery authentication
-
-### Encrypted Transport
-
-All file transfers use a custom encrypted transport:
-
-1. **X25519 key exchange** - Ephemeral keys provide forward secrecy
-2. **HKDF key derivation** - Separate TX/RX session keys
-3. **Ed25519 mutual authentication** - Both peers prove identity
-4. **ChaCha20-Poly1305 frames** - Authenticated encryption with replay protection
-
-### Trust Model (TOFU)
-
-Peer identities follow Trust-On-First-Use:
-
-- First contact: Identity is stored in the trust database
-- Subsequent contacts: Identity must match stored key
-- Mismatch: Connection is rejected (potential MITM attack)
-
-Trust database location:
-
-```text
-~/.local/share/P2PFileExchange/trust.db    (Linux)
-%LOCALAPPDATA%\P2PFileExchange\trust.db    (Windows)
-```
-
-### Discovery Authentication
-
-Each discovery broadcast includes:
-
-- Peer ID, display name, IP address, TCP port
-- Ed25519 public key
-- Timestamp and random nonce (anti-replay)
-- Ed25519 signature over all fields
-
-Invalid signatures are silently discarded.
-
 ## Documentation
 
-For detailed protocol specifications, see:
+For detailed specifications, see:
 
 | Document | Description |
 |----------|-------------|
@@ -145,7 +79,7 @@ For detailed protocol specifications, see:
 
 ```text
 src/
-├── P2PFileExchange.Core/           # Core library
+├── P2PFileExchange.Core/       # Core library
 │   ├── Models/                     # Data models
 │   ├── Services/
 │   │   ├── Discovery/              # UDP peer discovery
@@ -153,10 +87,11 @@ src/
 │   │   └── Transfer/               # TCP file transfer
 │   └── Utilities/                  # Helpers
 │
-└── P2PFileExchange.Desktop/        # Avalonia UI client
+└── P2PFileExchange.Desktop/    # Avalonia UI client
     ├── ViewModels/                 # MVVM view models
     ├── Views/                      # AXAML views
-    └── Services/                   # UI services
+    ├── Services/                   # UI services
+    └── Settings/                   # App settings
 ```
 
 ## Building
@@ -170,14 +105,8 @@ dotnet build -c Release
 
 # Run tests (if any)
 dotnet test
-
-# Publish for Linux
-dotnet publish src/P2PFileExchange.Desktop -c Release -r linux-x64
-
-# Publish for Windows
-dotnet publish src/P2PFileExchange.Desktop -c Release -r win-x64
 ```
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - refer to [LICENSE](LICENSE) file for details.
