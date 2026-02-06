@@ -52,7 +52,7 @@ public sealed class IdentityKeyManager : IDisposable
     private const int DerivedKeyLength = 32;
 
     /// <summary>
-    /// Total encrypted file size: salt(32) + nonce(24) + ciphertext(64) + tag(16) = 136 bytes.
+    /// Total encrypted file size: salt(32) + nonce(24) + ciphertext(64) + tag(16)
     /// </summary>
     public const int EncryptedFileSize =
         SaltLength + NonceLength + PrivateKeyLength + TagLength;

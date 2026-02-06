@@ -10,8 +10,7 @@ using P2PFileExchange.Core.Models;
 namespace P2PFileExchange.Core.Services.Transfer;
 
 /// <summary>
-/// Implements the wire protocol for metadata and chunk payloads.
-/// Not to be confused with the actual File Transfer Protocol (FTP).
+/// Implements the primitives for the wire protocol for metadata and chunk payloads.
 ///
 /// <list type="bullet">
 /// <item>Encodes all integer fields as little-endian 32-bit signed values.</item>
