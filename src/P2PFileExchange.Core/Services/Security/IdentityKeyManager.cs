@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -201,7 +202,7 @@ public sealed class IdentityKeyManager : IDisposable
         }
 
         byte[] hash = SHA256.HashData(publicKey);
-        Span<byte> guidBytes = hash.AsSpan(0, 16);
+        ReadOnlySpan<byte> guidBytes = hash.AsSpan(0, 16);
         return new Guid(guidBytes);
     }
 
@@ -225,17 +226,7 @@ public sealed class IdentityKeyManager : IDisposable
         string hex = Convert.ToHexString(hash);
 
         // Format as 4-character groups separated by spaces
-        var builder = new StringBuilder(hex.Length + (hex.Length / 4) - 1);
-        for (int i = 0; i < hex.Length; i += 4)
-        {
-            if (i > 0)
-            {
-                _ = builder.Append(' ');
-            }
-            _ = builder.Append(hex, i, Math.Min(4, hex.Length - i));
-        }
-
-        return builder.ToString();
+        return string.Join(" ", hex.Chunk(4));
     }
 
     /// <summary>
@@ -288,11 +279,13 @@ public sealed class IdentityKeyManager : IDisposable
                     () =>
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        using var argon2 = new Argon2id(passwordBytes);
+                        using Argon2id argon2 = new(passwordBytes);
+
                         argon2.Salt = salt;
                         argon2.MemorySize = Argon2MemoryKB;
                         argon2.Iterations = Argon2Iterations;
                         argon2.DegreeOfParallelism = Argon2Parallelism;
+
                         return argon2.GetBytes(DerivedKeyLength);
                     },
                     cancellationToken
