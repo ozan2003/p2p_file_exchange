@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -112,7 +113,7 @@ public sealed class IdentityKeyManager : IDisposable
     /// Gets the Ed25519 public key (32 bytes).
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if no key is loaded.</exception>
-    public byte[] PublicKey
+    public ImmutableArray<byte> PublicKey
     {
         get
         {
@@ -123,7 +124,7 @@ public sealed class IdentityKeyManager : IDisposable
                     "No identity key is loaded."
                 );
             }
-            return this.m_publicKey;
+            return ImmutableArray.Create(this.m_publicKey);
         }
     }
 
@@ -136,7 +137,7 @@ public sealed class IdentityKeyManager : IDisposable
         get
         {
             this.ThrowIfDisposed();
-            return ComputePeerId(this.PublicKey);
+            return ComputePeerId(this.PublicKey.AsSpan());
         }
     }
 
@@ -149,7 +150,7 @@ public sealed class IdentityKeyManager : IDisposable
         get
         {
             this.ThrowIfDisposed();
-            return ComputeFingerprint(this.PublicKey);
+            return ComputeFingerprint(this.PublicKey.AsSpan());
         }
     }
 
@@ -162,7 +163,7 @@ public sealed class IdentityKeyManager : IDisposable
         get
         {
             this.ThrowIfDisposed();
-            return Convert.ToBase64String(this.PublicKey);
+            return Convert.ToBase64String(this.PublicKey.AsSpan());
         }
     }
 
@@ -190,9 +191,8 @@ public sealed class IdentityKeyManager : IDisposable
     /// </summary>
     /// <param name="publicKey">The Ed25519 public key (32 bytes).</param>
     /// <returns>A GUID representing the peer ID.</returns>
-    public static Guid ComputePeerId(byte[] publicKey)
+    public static Guid ComputePeerId(ReadOnlySpan<byte> publicKey)
     {
-        ArgumentNullException.ThrowIfNull(publicKey);
         if (publicKey.Length != PublicKeyLength)
         {
             throw new ArgumentException(

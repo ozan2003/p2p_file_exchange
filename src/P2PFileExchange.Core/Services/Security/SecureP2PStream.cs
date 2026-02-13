@@ -337,7 +337,7 @@ public sealed class SecureP2PStream : Stream
 
                 // Sign the auth data with our identity key
                 byte[] mySignature = this.m_localIdentity.Sign(authData);
-                byte[] myIdentityPublic = this.m_localIdentity.PublicKey;
+                byte[] myIdentityPublic = [.. this.m_localIdentity.PublicKey];
 
                 // Prepare auth message: [identity_public (32)][signature (64)]
                 byte[] myAuthMessage = new byte[
