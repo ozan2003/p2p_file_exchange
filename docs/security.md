@@ -101,11 +101,11 @@ CREATE TABLE TrustedPeers (
 
 ### Trust Levels
 
-| Level | Name | Description |
-|-------|------|-------------|
-| 0 | Blocked | Peer is explicitly blocked |
-| 1 | TOFU | Trusted on first use (default) |
-| 2 | Verified | Manually verified (e.g., via fingerprint comparison) |
+There are 3 trust levels:
+
+- Unknown
+- Trusted
+- Blocked
 
 ## SecureP2PStream Protocol
 
