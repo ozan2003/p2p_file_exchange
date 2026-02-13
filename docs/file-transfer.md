@@ -78,7 +78,11 @@ sequenceDiagram
 
 ### Message Types
 
-All messages are serialized as JSON and encrypted via `SecureP2PStream`.
+Messages are encoded by `FileTransferProtocol` and then encrypted via `SecureP2PStream`:
+
+- `FileMetadata`: length-prefixed JSON payload
+- `TransferResponse`: single byte enum value
+- `FileChunk`: binary frame (`index + data length + hash length + data + hash`)
 
 ```mermaid
 classDiagram
@@ -124,36 +128,30 @@ Sent by the sender immediately after handshake:
 
 ### TransferResponse
 
-Sent by receiver after user prompt:
+Sent by receiver after user prompt as a single byte:
 
-```json
-{
-  "response": 0
-}
+```text
+[response: 1 byte]
 ```
 
 | Value | Meaning |
 |-------|---------|
-| 0 | Accepted |
-| 1 | Rejected |
+| 1 | Accepted |
+| 2 | Rejected |
 
 ### FileChunk
 
-Sent for each chunk of the file:
+Sent for each chunk of the file as a binary frame:
 
-```json
-{
-  "chunkIndex": 0,
-  "data": "Base64EncodedData",
-  "hash": "Base64SHA256Hash"
-}
+```text
+[chunkIndex:int32 LE][dataLength:int32 LE][hashLength:int32 LE][data bytes][hash bytes]
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `chunkIndex` | int32 | Zero-based chunk index |
-| `data` | Base64 | Chunk bytes |
-| `hash` | Base64 | SHA-256 hash of data (32 bytes) |
+| `data` | bytes | Chunk bytes |
+| `hash` | bytes | SHA-256 hash of data (32 bytes) |
 
 ## Chunking Strategy
 
@@ -179,7 +177,7 @@ flowchart LR
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | Chunk Size | 256 KB | Maximum bytes per chunk |
-| Buffer Size | 64 KB | File I/O buffer size |
+| Buffer Size | 80 KB | File I/O buffer size |
 
 ### Chunk Count Calculation
 
@@ -209,7 +207,7 @@ flowchart TD
 ### Verification Steps
 
 1. Receiver computes `SHA256(chunk.data)`
-2. Compare with `chunk.hash` using constant-time comparison
+2. Compare with `chunk.hash`
 3. On mismatch: abort transfer, delete partial file
 4. On match: write chunk to disk
 
@@ -342,8 +340,9 @@ stateDiagram-v2
 public sealed class FileTransferOptions
 {
     public int ChunkSize { get; set; } = 256 * 1024;      // 256 KB
-    public int BufferSize { get; set; } = 64 * 1024;      // 64 KB
+    public int BufferSize { get; set; } = 80 * 1024;      // 80 KB
     public TimeSpan HandshakeTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    public TimeSpan TransferRequestTimeout { get; set; } = TimeSpan.FromMinutes(2);
 }
 ```
 
@@ -371,17 +370,18 @@ All protocol messages are wrapped in `SecureP2PStream` frames:
 │                    SecureP2PStream Frame                    │
 ├────────────────┬────────────────┬───────────────────────────┤
 │ Frame Number   │ Length         │ Ciphertext + Tag          │
-│ (8 bytes)      │ (2 bytes)      │ (JSON + 16 byte tag)      │
+│ (8 bytes)      │ (2 bytes)      │ (plaintext + 16 byte tag) │
 └────────────────┴────────────────┴───────────────────────────┘
 ```
 
 ### Message Framing
 
-Each protocol message (metadata, response, chunk) is:
+Each protocol message is encoded by `FileTransferProtocol` first, then written through
+`SecureP2PStream`:
 
-1. Serialized to JSON
-2. Encrypted with ChaCha20-Poly1305
-3. Sent as one or more frames (max 16 KB payload per frame)
+1. Encode message (`metadata` JSON length-prefixed, `response` 1 byte, `chunk` binary fields)
+2. Encrypt with ChaCha20-Poly1305
+3. Send as one or more secure frames (max 16 KB plaintext payload per secure frame)
 
 ## Sequence Diagram: Complete Transfer
 

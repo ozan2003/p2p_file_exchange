@@ -88,14 +88,16 @@ flowchart TD
 
 ```sql
 CREATE TABLE TrustedPeers (
-    PeerId TEXT PRIMARY KEY,           -- GUID derived from public key
-    PublicKey BLOB NOT NULL,           -- Ed25519 public key (32 bytes)
-    Fingerprint TEXT NOT NULL,         -- Human-readable fingerprint
-    CachedDisplayName TEXT,            -- Last known display name
-    FirstSeenUtc INTEGER NOT NULL,     -- Unix timestamp
-    LastSeenUtc INTEGER NOT NULL,      -- Unix timestamp
-    TrustLevel INTEGER DEFAULT 1,      -- 0=Blocked, 1=TOFU, 2=Verified
-    Notes TEXT                         -- User notes
+    PeerId TEXT PRIMARY KEY,               -- GUID derived from public key
+    DisplayName TEXT NOT NULL,             -- Last known display name
+    Ed25519PublicKey BLOB NOT NULL,        -- Ed25519 public key (32 bytes)
+    PublicKeyFingerprint TEXT NOT NULL,    -- Human-readable fingerprint
+    TrustLevel INTEGER NOT NULL DEFAULT 0, -- 0=Unknown, 1=Trusted, 2=Blocked
+    FirstSeen INTEGER NOT NULL,            -- Unix timestamp
+    LastSeen INTEGER NOT NULL,             -- Unix timestamp
+    TransferCount INTEGER NOT NULL DEFAULT 0,
+    FailedTransferCount INTEGER NOT NULL DEFAULT 0,
+    Notes TEXT                             -- User notes
 );
 ```
 
@@ -131,8 +133,8 @@ sequenceDiagram
     Note over I,R: Step 3: Session Key Derivation (HKDF-SHA256)
     I->>I: salt = initiator_pub || responder_pub
     R->>R: salt = initiator_pub || responder_pub
-    I->>I: keys = HKDF(shared, salt, "P2PFileTransfer-v1-session", 64)
-    R->>R: keys = HKDF(shared, salt, "P2PFileTransfer-v1-session", 64)
+    I->>I: keys = HKDF(shared, salt, "P2PFileExchange-v1-session", 64)
+    R->>R: keys = HKDF(shared, salt, "P2PFileExchange-v1-session", 64)
     
     Note over I,R: Step 4: Key Assignment
     I->>I: tx_key = keys[0:32], rx_key = keys[32:64]
@@ -168,7 +170,7 @@ After handshake, all data is transmitted in encrypted frames:
 **Replay Protection:**
 
 - Frame numbers are monotonically increasing
-- Receiver rejects frames with `frame_number <= last_received`
+- Receiver requires `frame_number == expected_next_frame`
 - Maximum payload size: 16 KB
 
 **Nonce Construction:**

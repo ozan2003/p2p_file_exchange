@@ -177,12 +177,9 @@ public sealed class PeerInfo
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Discovered: First announcement
-    Discovered --> Active: Announcements received
+    [*] --> Active: First valid announcement
     Active --> Active: Update LastSeen
-    Active --> Stale: No announcement for 30s
-    Stale --> Active: Announcement received
-    Stale --> Removed: Timeout (60s)
+    Active --> Removed: No announcement for PeerTimeout
     Removed --> [*]: PeerRemoved event
 ```
 
@@ -191,8 +188,8 @@ stateDiagram-v2
 | Parameter | Default Value | Description |
 |-----------|---------------|-------------|
 | Broadcast Interval | 5 seconds | How often to send announcements |
-| Peer Timeout | 30 seconds | Mark peer as stale |
-| Cleanup Interval | 10 seconds | How often to check for stale peers |
+| Peer Timeout | 15 seconds | Remove peer if no valid announcement is received |
+| Cleanup Interval | 5 seconds | How often to remove timed-out peers and expire nonce/rate-limit entries |
 | Deduplication Window | 10 seconds | Ignore duplicate announcements |
 
 ## Security Measures
@@ -252,7 +249,8 @@ public sealed class PeerDiscoveryOptions
     public ushort BroadcastPort { get; set; } = 37020;
     public IPAddress BroadcastAddress { get; set; } = IPAddress.Broadcast;
     public TimeSpan BroadcastInterval { get; set; } = TimeSpan.FromSeconds(5);
-    public TimeSpan PeerTimeout { get; set; } = TimeSpan.FromSeconds(30);
+    public TimeSpan PeerTimeout { get; set; } = TimeSpan.FromSeconds(15);
+    public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromSeconds(5);
 }
 ```
 
@@ -315,9 +313,9 @@ sequenceDiagram
     DS-->>UI: PeerUpdated(peerInfo)
     
     Note over UI,Net: Cleanup
-    loop Every 10 seconds
+    loop Every 5 seconds
         DS->>DS: Check peer timeouts
-        DS->>DS: Remove stale peers
+        DS->>DS: Remove timed-out peers
         DS-->>UI: PeerRemoved(peerId)
     end
 ```
