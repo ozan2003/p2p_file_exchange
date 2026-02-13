@@ -174,8 +174,8 @@ After handshake, all data is transmitted in encrypted frames:
 **Nonce Construction:**
 
 ```csharp
-nonce[0..4]  = 0x00000000 // padding
-nonce[4..12] = frame_number // big-endian
+nonce[0..8]  = frame_number // big-endian
+nonce[8..12] = 0x00000000 // padding
 ```
 
 ## Security Properties
