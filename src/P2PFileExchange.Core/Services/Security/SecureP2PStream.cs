@@ -302,6 +302,7 @@ public sealed class SecureP2PStream : Stream
                     sharedSecret,
                     salt
                 );
+                CryptographicOperations.ZeroMemory(sharedSecret);
 
                 // Assign keys based on role (ensures each direction uses different key)
                 if (isInitiator)
@@ -509,6 +510,9 @@ public sealed class SecureP2PStream : Stream
 
         byte[] txKey = derivedKeys[..SessionKeyLength];
         byte[] rxKey = derivedKeys[SessionKeyLength..];
+
+        CryptographicOperations.ZeroMemory(info);
+        CryptographicOperations.ZeroMemory(derivedKeys);
 
         return (txKey, rxKey);
     }
