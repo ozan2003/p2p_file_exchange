@@ -851,30 +851,48 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <returns>True if within limits, false if rate limited.</returns>
     private bool CheckRateLimit(Guid peerId)
     {
+        const int maxRetries = 5;
+
         DateTimeOffset now = DateTimeOffset.UtcNow;
         DateTimeOffset windowStart = now.AddMinutes(-1);
 
-        (DateTimeOffset WindowStart, int Count) current =
-            this.m_rateLimits.GetOrAdd(peerId, _ => (now, 0));
-
-        if (current.WindowStart < windowStart)
+        for (int attempt = 0; attempt < maxRetries; ++attempt)
         {
-            // Reset window
-            _ = this.m_rateLimits.TryUpdate(peerId, (now, 1), current);
-            return true;
+            (DateTimeOffset WindowStart, int Count) current =
+                this.m_rateLimits.GetOrAdd(peerId, _ => (now, 0));
+
+            if (current.WindowStart < windowStart)
+            {
+                // Window expired, reset
+                if (this.m_rateLimits.TryUpdate(peerId, (now, 1), current))
+                {
+                    return true;
+                }
+
+                continue; // CAS failed, retry with a fresh value
+            }
+
+            if (current.Count >= MaxAnnouncementsPerMinute)
+            {
+                return false;
+            }
+
+            // Increment counter
+            if (
+                this.m_rateLimits.TryUpdate(
+                    peerId,
+                    (current.WindowStart, current.Count + 1),
+                    current
+                )
+            )
+            {
+                return true;
+            }
+
+            // CAS failed, retry with fresh value
         }
 
-        if (current.Count >= MaxAnnouncementsPerMinute)
-        {
-            return false;
-        }
-
-        // Increment counter
-        _ = this.m_rateLimits.TryUpdate(
-            peerId,
-            (current.WindowStart, current.Count + 1),
-            current
-        );
+        // Exhausted retries, fail open (allow the packet)
         return true;
     }
 
