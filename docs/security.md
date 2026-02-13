@@ -251,6 +251,7 @@ All security-relevant events are logged to an SQLite database:
 | Traffic analysis | Packet sizes/timing are visible |
 | First-contact MITM | TOFU trusts first identity seen |
 | Denial of service | No built-in DDoS protection |
+| Same-user secret access (Linux/macOS) | Auto-unlock secret is protected by file permissions only (chmod 600); any process running as the same user can read it. Use `RequirePasswordOnStartup = true` for stronger protection. On Windows, DPAPI provides user-scope encryption. |
 
 ## File Locations
 

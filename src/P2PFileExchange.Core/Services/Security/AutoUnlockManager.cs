@@ -13,6 +13,14 @@ namespace P2PFileExchange.Core.Services.Security;
 /// Manages auto-unlock secrets for passwordless identity key decryption.
 /// Uses platform-specific secure storage (DPAPI on Windows, file-based on Linux/Mac).
 /// </summary>
+/// <remarks>
+/// <para><b>Security note (Linux/macOS):</b> On non-Windows platforms, the auto-unlock
+/// secret is stored as a plain file protected only by filesystem permissions (chmod 600).
+/// Any process running as the same user can read it. For higher-security environments,
+/// prefer requiring a password on startup (<c>RequirePasswordOnStartup = true</c>).</para>
+/// <para>On Windows, DPAPI provides user-scope encryption that is bound to the
+/// logged-in user's credentials, offering significantly stronger protection.</para>
+/// </remarks>
 public static class AutoUnlockManager
 {
     /// <summary>
@@ -144,7 +152,7 @@ public static class AutoUnlockManager
         }
         else
         {
-            // On Linux/Mac, use file permissions as best-effort protection
+            // On Linux/Mac, use file permissions as a best-effort protection
             // The secret is stored with restrictive permissions
             protectedData = secret;
         }

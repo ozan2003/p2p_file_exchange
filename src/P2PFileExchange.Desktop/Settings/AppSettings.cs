@@ -70,6 +70,12 @@ public sealed class SecuritySettings
     /// When false, uses auto-unlock with OS-protected secret storage.
     /// Default: true (require password for maximum security).
     /// </summary>
+    /// <remarks>
+    /// On Linux/macOS, auto-unlock stores the secret as a plain file with
+    /// restrictive permissions (chmod 600). Any process running as the same
+    /// user can read it. Recommend keeping this <c>true</c> on those platforms
+    /// unless convenience is prioritized over security.
+    /// </remarks>
     public bool RequirePasswordOnStartup { get; set; } = true;
 
     /// <summary>
