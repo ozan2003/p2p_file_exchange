@@ -172,6 +172,35 @@ Detailed protocol and design docs live under `docs/`:
 | [docs/peer-discovery.md](docs/peer-discovery.md) | UDP broadcast protocol, signed announcements |
 | [docs/file-transfer.md](docs/file-transfer.md) | TCP transport, chunking, integrity checks |
 
+### Documentation Workflow
+
+Update documentation in the same change whenever behavior or contracts change.
+
+Documentation updates are required when:
+
+- Protocol, security, discovery, or transfer behavior changes
+- Settings/configuration behavior changes
+- User-visible desktop behavior changes
+- Public API contracts change (public classes, interfaces, methods, or
+  parameters)
+
+For C# XML documentation:
+
+- Keep XML comments up to date for public classes and interfaces
+- Keep XML comments up to date for public/protected methods
+- Update tags when behavior changes: `<summary>`, `<param>`, `<returns>`,
+  and `<remarks>` (when present)
+
+Pre-merge documentation checklist:
+
+- Verify affected files in `docs/` are updated when behavior changes
+- Verify XML docs are added/updated for changed public members
+- Verify examples, paths, and commands are still accurate
+- Use a `docs(...)` commit scope when the change is documentation-only
+
+Note: For AI agent actions, the Boundaries section still applies. Modifying
+files under `docs/` requires explicit user approval before proceeding.
+
 ## Boundaries
 
 The following actions require **explicit user approval** before proceeding:
