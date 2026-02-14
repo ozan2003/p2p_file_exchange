@@ -226,7 +226,18 @@ public sealed class IdentityKeyManager : IDisposable
         string hex = Convert.ToHexString(hash);
 
         // Format as 4-character groups separated by spaces
-        return string.Join(" ", hex.Chunk(4));
+        StringBuilder fingerprint = new(hex.Length + hex.Length / 4);
+
+        for (int i = 0; i < hex.Length; i += 4)
+        {
+            if (i > 0)
+            {
+                fingerprint.Append(' ');
+            }
+            fingerprint.Append(hex, i, 4);
+        }
+
+        return fingerprint.ToString();
     }
 
     /// <summary>
