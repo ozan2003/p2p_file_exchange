@@ -20,10 +20,12 @@ namespace P2PFileExchange.Core.Services.Security;
 /// </summary>
 /// <remarks>
 /// Protocol:
-/// 1. Ephemeral X25519 key exchange
-/// 2. HKDF session key derivation (separate TX/RX keys)
-/// 3. Ed25519 mutual authentication with identity keys
-/// 4. ChaCha20-Poly1305 frame encryption with replay protection
+/// <list type="number">
+/// <item>Ephemeral X25519 key exchange</item>
+/// <item>HKDF session key derivation (separate TX/RX keys)</item>
+/// <item>Ed25519 mutual authentication with identity keys</item>
+/// <item>ChaCha20-Poly1305 frame encryption with replay protection</item>
+/// </list>
 /// </remarks>
 public sealed class SecureP2PStream : Stream
 {
