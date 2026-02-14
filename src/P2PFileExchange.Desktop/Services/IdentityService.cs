@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
@@ -66,7 +67,7 @@ public sealed class IdentityService : IDisposable
     /// Gets the public key bytes.
     /// </summary>
     /// <exception cref="InvalidOperationException">Thrown if not initialized.</exception>
-    public byte[] PublicKey => this.m_keyManager.PublicKey;
+    public ImmutableArray<byte> PublicKey => this.m_keyManager.PublicKey;
 
     /// <summary>
     /// Initializes the identity key, either by loading an existing key or creating a new one.
