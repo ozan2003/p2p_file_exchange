@@ -739,19 +739,37 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 )
             )
             {
-                if (
-                    !string.IsNullOrEmpty(existingPeer.IdentityPublicKey)
-                    && !string.Equals(
-                        existingPeer.IdentityPublicKey,
-                        announcement.PublicKey,
-                        StringComparison.Ordinal
-                    )
-                )
+                if (!string.IsNullOrEmpty(existingPeer.IdentityPublicKey))
                 {
-                    return (
-                        false,
-                        "Identity key mismatch - possible impersonation attempt"
-                    );
+                    try
+                    {
+                        byte[] existingKeyBytes = Convert.FromBase64String(
+                            existingPeer.IdentityPublicKey
+                        );
+                        bool hasSameLength =
+                            existingKeyBytes.Length == publicKeyBytes.Length;
+                        bool isSameKey =
+                            hasSameLength
+                            && CryptographicOperations.FixedTimeEquals(
+                                existingKeyBytes,
+                                publicKeyBytes
+                            );
+
+                        if (!isSameKey)
+                        {
+                            return (
+                                false,
+                                "Identity key mismatch - possible impersonation attempt"
+                            );
+                        }
+                    }
+                    catch (FormatException)
+                    {
+                        return (
+                            false,
+                            "Identity key mismatch - possible impersonation attempt"
+                        );
+                    }
                 }
             }
 
