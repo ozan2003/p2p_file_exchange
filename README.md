@@ -75,25 +75,6 @@ For detailed specifications, see:
 | [Peer Discovery Protocol](docs/peer-discovery.md) | UDP broadcast, signed announcements, verification |
 | [File Transfer Protocol](docs/file-transfer.md) | TCP transport, chunking, integrity checks |
 
-## Project Layout
-
-```text
-src/
-├── P2PFileExchange.Core/       # Core library
-│   ├── Models/                     # Data models
-│   ├── Services/
-│   │   ├── Discovery/              # UDP peer discovery
-│   │   ├── Security/               # Crypto, trust, audit
-│   │   └── Transfer/               # TCP file transfer
-│   └── Utilities/                  # Helpers
-│
-└── P2PFileExchange.Desktop/    # Avalonia UI client
-    ├── ViewModels/                 # MVVM view models
-    ├── Views/                      # AXAML views
-    ├── Services/                   # UI services
-    └── Settings/                   # App settings
-```
-
 ## Building
 
 ```bash
