@@ -8,7 +8,7 @@ using Microsoft.Data.Sqlite;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Utilities;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Manages the TOFU (Trust-On-First-Use) trust database for peer identity verification.
@@ -240,7 +240,10 @@ public sealed class PeerTrustManager : IAsyncDisposable
                 this.m_connection!.CreateCommand();
             command.CommandText = sql;
             command.Parameters.AddWithValue("@peerId", peerId.ToString());
-            command.Parameters.AddWithValue("@displayName", displayName);
+            command.Parameters.AddWithValue(
+                "@displayName",
+                displayName.ToString()
+            );
             command.Parameters.AddWithValue("@publicKey", ed25519PublicKey);
             command.Parameters.AddWithValue("@fingerprint", fingerprint);
             command.Parameters.AddWithValue(
@@ -602,16 +605,17 @@ public sealed class PeerTrustManager : IAsyncDisposable
         this.ThrowIfDisposed();
         this.ThrowIfNotInitialized();
 
-        string column = success ? "TransferCount" : "FailedTransferCount";
-        string sql =
-            $"UPDATE TrustedPeers SET {column} = {column} + 1 WHERE PeerId = @peerId";
+        const string sqlSuccess =
+            "UPDATE TrustedPeers SET TransferCount = TransferCount + 1 WHERE PeerId = @peerId";
+        const string sqlFailure =
+            "UPDATE TrustedPeers SET FailedTransferCount = FailedTransferCount + 1 WHERE PeerId = @peerId";
 
         await this.m_dbLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
             await using SqliteCommand command =
                 this.m_connection!.CreateCommand();
-            command.CommandText = sql;
+            command.CommandText = success ? sqlSuccess : sqlFailure;
             command.Parameters.AddWithValue("@peerId", peerId.ToString());
 
             _ = await command
@@ -1019,8 +1023,6 @@ public sealed class PeerTrustManager : IAsyncDisposable
             return;
         }
 
-        this.m_disposed = true;
-
         if (this.m_connection is not null)
         {
             await this.m_connection.CloseAsync().ConfigureAwait(false);
@@ -1028,6 +1030,7 @@ public sealed class PeerTrustManager : IAsyncDisposable
             this.m_connection = null;
         }
 
+        this.m_disposed = true;
         this.m_dbLock.Dispose();
     }
 

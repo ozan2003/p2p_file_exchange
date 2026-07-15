@@ -11,7 +11,7 @@ using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Utilities;
 using Sodium;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Provides an encrypted stream wrapper using X25519 key exchange, Ed25519 authentication,
@@ -544,10 +544,9 @@ public sealed class SecureP2PStream : Stream
     /// <inheritdoc />
     public override int Read(byte[] buffer, int offset, int count)
     {
-        return this.ReadAsync(buffer, offset, count, CancellationToken.None)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        throw new NotSupportedException(
+            "Synchronous reads are not supported. Use ReadAsync instead."
+        );
     }
 
     /// <inheritdoc />
@@ -656,10 +655,9 @@ public sealed class SecureP2PStream : Stream
     /// <inheritdoc />
     public override void Write(byte[] buffer, int offset, int count)
     {
-        this.WriteAsync(buffer, offset, count, CancellationToken.None)
-            .ConfigureAwait(false)
-            .GetAwaiter()
-            .GetResult();
+        throw new NotSupportedException(
+            "Synchronous writes are not supported. Use WriteAsync instead."
+        );
     }
 
     /// <inheritdoc />
@@ -1070,7 +1068,6 @@ public sealed class SecureP2PStream : Stream
         }
 
         this.m_isDisposed = true;
-        GC.SuppressFinalize(this);
     }
 
     #endregion Disposal

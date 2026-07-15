@@ -4,9 +4,9 @@ using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
-namespace P2PFileExchange.Core.Services.Discovery;
+namespace P2PFileExchange.Core.Discovery;
 
 /// <summary>
 /// Describes peer discovery operations over UDP broadcast on the same LAN.

@@ -74,7 +74,7 @@ public sealed class IPAddressConverter : JsonConverter<IPAddress>
     {
         if (reader.TokenType == JsonTokenType.Null)
         {
-            return IPAddress.Broadcast;
+            return IPAddress.None;
         }
 
         if (reader.TokenType != JsonTokenType.String)

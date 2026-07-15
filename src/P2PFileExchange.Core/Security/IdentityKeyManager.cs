@@ -10,7 +10,7 @@ using Konscious.Security.Cryptography;
 using P2PFileExchange.Core.Utilities;
 using Sodium;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Manages Ed25519 identity keys for persistent peer authentication using TOFU (Trust-On-First-Use).

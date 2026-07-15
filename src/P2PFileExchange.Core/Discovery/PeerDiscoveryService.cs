@@ -13,11 +13,11 @@ using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
+using P2PFileExchange.Core.Security;
 using P2PFileExchange.Core.Serialization;
-using P2PFileExchange.Core.Services.Security;
 using P2PFileExchange.Core.Utilities;
 
-namespace P2PFileExchange.Core.Services.Discovery;
+namespace P2PFileExchange.Core.Discovery;
 
 /// <summary>
 /// Handles UDP broadcast discovery of peers on the local network.
@@ -58,11 +58,12 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <summary>
     /// JSON serialization options for canonical signing.
     /// </summary>
-    private static readonly JsonSerializerOptions s_canonicalJsonOptions = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        WriteIndented = false,
-    };
+    private static readonly JsonSerializerOptions s_canonicalJsonOptions =
+        new()
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            WriteIndented = false,
+        };
     #endregion Constants
 
     #region Configuration
@@ -389,10 +390,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <returns>A configured UDP client ready to receive broadcasts.</returns>
     private UdpClient CreateListenerClient()
     {
-        UdpClient client = new(AddressFamily.InterNetwork)
-        {
-            EnableBroadcast = true,
-        };
+        UdpClient client =
+            new(AddressFamily.InterNetwork) { EnableBroadcast = true };
 
         client.Client.SetSocketOption(
             SocketOptionLevel.Socket,
@@ -412,10 +411,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     /// <returns>A configured UDP client ready to send broadcasts.</returns>
     private static UdpClient CreateBroadcastClient()
     {
-        UdpClient client = new(AddressFamily.InterNetwork)
-        {
-            EnableBroadcast = true,
-        };
+        UdpClient client =
+            new(AddressFamily.InterNetwork) { EnableBroadcast = true };
 
         client.Client.SetSocketOption(
             SocketOptionLevel.Socket,
@@ -436,10 +433,8 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
         CancellationToken cancellationToken
     )
     {
-        IPEndPoint endpoint = new(
-            this.m_options.BroadcastAddress,
-            this.m_options.BroadcastPort
-        );
+        IPEndPoint endpoint =
+            new(this.m_options.BroadcastAddress, this.m_options.BroadcastPort);
         using PeriodicTimer timer = new(this.m_options.BroadcastInterval);
 
         while (!cancellationToken.IsCancellationRequested)
@@ -474,17 +469,18 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
                 );
                 string signature = Convert.ToBase64String(signatureBytes);
 
-                PeerAnnouncement announcement = new()
-                {
-                    PeerId = this.LocalPeerId,
-                    DisplayName = displayName,
-                    IPAddress = NetworkUtilities.GetPrimaryIPv4Address(),
-                    TcpPort = this.m_tcpPort,
-                    PublicKey = this.m_identityKeyManager.PublicKeyBase64,
-                    Timestamp = timestamp,
-                    Nonce = nonceBase64,
-                    Signature = signature,
-                };
+                PeerAnnouncement announcement =
+                    new()
+                    {
+                        PeerId = this.LocalPeerId,
+                        DisplayName = displayName,
+                        IPAddress = NetworkUtilities.GetPrimaryIPv4Address(),
+                        TcpPort = this.m_tcpPort,
+                        PublicKey = this.m_identityKeyManager.PublicKeyBase64,
+                        Timestamp = timestamp,
+                        Nonce = nonceBase64,
+                        Signature = signature,
+                    };
 
                 byte[] payload = JsonSerializer.SerializeToUtf8Bytes(
                     announcement,
@@ -824,14 +820,15 @@ public sealed class PeerDiscoveryService : IPeerDiscoveryService
     )
     {
         ArrayBufferWriter<byte> buffer = new(256);
-        using Utf8JsonWriter writer = new(
-            buffer,
-            new JsonWriterOptions
-            {
-                Encoder = this.m_jsonOptions.Encoder,
-                Indented = this.m_jsonOptions.WriteIndented,
-            }
-        );
+        using Utf8JsonWriter writer =
+            new(
+                buffer,
+                new JsonWriterOptions
+                {
+                    Encoder = this.m_jsonOptions.Encoder,
+                    Indented = this.m_jsonOptions.WriteIndented,
+                }
+            );
 
         writer.WriteStartObject();
 

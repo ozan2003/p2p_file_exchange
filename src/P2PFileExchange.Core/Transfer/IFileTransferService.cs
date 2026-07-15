@@ -4,9 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
-namespace P2PFileExchange.Core.Services.Transfer;
+namespace P2PFileExchange.Core.Transfer;
 
 /// <summary>
 /// Provides file transfer operations over TCP.
@@ -64,6 +64,30 @@ public interface IFileTransferService : IAsyncDisposable
     );
 
     /// <summary>
+    /// Starts the TCP listener for inbound transfers with secure P2P transport and peer display name lookup.
+    /// </summary>
+    /// <param name="port">The port to listen on. Use 0 for a dynamic port.</param>
+    /// <param name="downloadDirectory">The directory where files are saved.</param>
+    /// <param name="identityKeyManager">The local Ed25519 identity key manager (must be loaded).</param>
+    /// <param name="peerLookup">
+    /// A function to look up known peer info by IP address for TOFU verification.
+    /// Returns null if the peer is unknown (first contact).
+    /// </param>
+    /// <param name="displayNameLookup">
+    /// A function to look up peer display names by IP address.
+    /// Returns null if the peer is unknown.
+    /// </param>
+    /// <param name="cancellationToken">A cancellation token.</param>
+    Task StartListenerAsync(
+        ushort port,
+        string downloadDirectory,
+        IdentityKeyManager identityKeyManager,
+        Func<IPAddress, PeerInfo?> peerLookup,
+        Func<IPAddress, string?>? displayNameLookup,
+        CancellationToken cancellationToken
+    );
+
+    /// <summary>
     /// Stops the TCP listener and cancels active accept loops.
     /// </summary>
     Task StopListenerAsync();
@@ -88,4 +112,10 @@ public interface IFileTransferService : IAsyncDisposable
     /// <param name="requestId">The request ID from <see cref="TransferRequestEventArgs"/>.</param>
     /// <param name="response">The response to send (Accepted or Rejected).</param>
     void RespondToTransferRequest(Guid requestId, TransferResponse response);
+
+    /// <summary>
+    /// Updates the download directory used for inbound transfers.
+    /// </summary>
+    /// <param name="downloadDirectory">The target download directory.</param>
+    void UpdateDownloadDirectory(string downloadDirectory);
 }

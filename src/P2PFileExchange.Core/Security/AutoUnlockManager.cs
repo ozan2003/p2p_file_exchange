@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Utilities;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Manages auto-unlock secrets for passwordless identity key decryption.

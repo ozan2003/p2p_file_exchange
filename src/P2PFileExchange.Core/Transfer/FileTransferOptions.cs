@@ -1,6 +1,6 @@
 using System;
 
-namespace P2PFileExchange.Core.Services.Transfer;
+namespace P2PFileExchange.Core.Transfer;
 
 /// <summary>
 /// Provides configuration for file transfers.

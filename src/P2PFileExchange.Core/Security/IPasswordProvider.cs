@@ -1,7 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Provides password input for identity key encryption/decryption.

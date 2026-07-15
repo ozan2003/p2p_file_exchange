@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 using System.Threading;
 using P2PFileExchange.Core.Models;
 
-namespace P2PFileExchange.Core.Services;
+namespace P2PFileExchange.Core;
 
 /// <summary>
 /// Handles file chunking operations.

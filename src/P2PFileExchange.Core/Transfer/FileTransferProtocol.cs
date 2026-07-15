@@ -7,7 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
 
-namespace P2PFileExchange.Core.Services.Transfer;
+namespace P2PFileExchange.Core.Transfer;
 
 /// <summary>
 /// Implements the primitives for the wire protocol for metadata and chunk payloads.
@@ -62,9 +62,8 @@ namespace P2PFileExchange.Core.Services.Transfer;
 internal static class FileTransferProtocol
 {
     /// <summary>JSON serialization settings for wire payloads.</summary>
-    private static readonly JsonSerializerOptions s_jsonOptions = new(
-        JsonSerializerDefaults.Web
-    );
+    private static readonly JsonSerializerOptions s_jsonOptions =
+        new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// Writes a metadata frame to the stream (length-prefixed JSON).

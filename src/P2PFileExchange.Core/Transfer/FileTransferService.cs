@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
@@ -9,10 +10,10 @@ using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 using P2PFileExchange.Core.Utilities;
 
-namespace P2PFileExchange.Core.Services.Transfer;
+namespace P2PFileExchange.Core.Transfer;
 
 /// <summary>
 /// Provides TCP-based file transfer functionality.
@@ -37,13 +38,16 @@ public sealed class FileTransferService : IFileTransferService
     private readonly SemaphoreSlim m_listenerLock = new(1, 1);
     #endregion Synchronization
 
-    #region Pending Requests
+    #region Active Transfers & Pending Requests
     /// <summary>Pending transfer requests awaiting user response.</summary>
     private readonly ConcurrentDictionary<
         Guid,
         TaskCompletionSource<TransferResponse>
     > m_pendingRequests = new();
-    #endregion Pending Requests
+
+    /// <summary>Active inbound transfer tasks keyed by transfer ID.</summary>
+    private readonly ConcurrentDictionary<Guid, Task> m_activeTransfers = new();
+    #endregion Active Transfers & Pending Requests
 
     #region Listener State
     /// <summary>The TCP listener for file transfers.</summary>
@@ -242,6 +246,17 @@ public sealed class FileTransferService : IFileTransferService
 
             this.m_pendingRequests.Clear();
 
+            // Await all active inbound transfer tasks.
+            if (!this.m_activeTransfers.IsEmpty)
+            {
+                Task[] activeTasks = [.. this.m_activeTransfers.Values];
+                await Task.WhenAll(
+                        activeTasks.Select(t => t.ContinueWith(_ => { }))
+                    )
+                    .ConfigureAwait(false);
+                this.m_activeTransfers.Clear();
+            }
+
             this.m_listenerCts?.Dispose();
             this.m_listener = null;
             this.m_listenerCts = null;
@@ -318,13 +333,14 @@ public sealed class FileTransferService : IFileTransferService
             fileInfo.Length,
             this.m_options.ChunkSize
         );
-        FileMetadata metadata = new()
-        {
-            FileName = Path.GetFileName(filePath),
-            FileSize = fileInfo.Length,
-            TotalChunksNumber = totalChunks,
-            ChunkSize = this.m_options.ChunkSize,
-        };
+        FileMetadata metadata =
+            new()
+            {
+                FileName = Path.GetFileName(filePath),
+                FileSize = fileInfo.Length,
+                TotalChunksNumber = totalChunks,
+                ChunkSize = this.m_options.ChunkSize,
+            };
 
         // Create a unique transfer ID and notify the UI that the transfer has started.
         Guid transferId = Guid.NewGuid();
@@ -362,11 +378,8 @@ public sealed class FileTransferService : IFileTransferService
             await using NetworkStream networkStream = client.GetStream();
 
             // Create secure P2P stream with X25519 key exchange and ChaCha20-Poly1305 encryption.
-            await using SecureP2PStream secureStream = new(
-                networkStream,
-                this.m_identityKeyManager,
-                leaveOpen: false
-            );
+            await using SecureP2PStream secureStream =
+                new(networkStream, this.m_identityKeyManager, leaveOpen: false);
 
             // Perform handshake as initiator (client).
             // Pass peer info for TOFU verification.
@@ -409,14 +422,15 @@ public sealed class FileTransferService : IFileTransferService
             }
 
             // Read the file chunks and send them to the peer.
-            await using FileStream fileStream = new(
-                filePath,
-                FileMode.Open,
-                FileAccess.Read,
-                FileShare.Read,
-                bufferSize: this.m_options.BufferSize,
-                useAsync: true
-            );
+            await using FileStream fileStream =
+                new(
+                    filePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: this.m_options.BufferSize,
+                    useAsync: true
+                );
 
             int chunkIndex = 0;
             IAsyncEnumerable<FileChunk> chunks = FileChunker.ReadChunksAsync(
@@ -532,7 +546,17 @@ public sealed class FileTransferService : IFileTransferService
                 client = await tcpListener
                     .AcceptTcpClientAsync(cancellationToken)
                     .ConfigureAwait(false);
-                _ = this.HandleIncomingAsync(client, cancellationToken);
+                Task handleTask = this.HandleIncomingAsync(
+                    client,
+                    cancellationToken
+                );
+                // Track the task temporarily; the handler self-removes when done.
+                Guid tempId = Guid.NewGuid();
+                this.m_activeTransfers[tempId] = handleTask;
+                _ = handleTask.ContinueWith(
+                    _ => this.m_activeTransfers.TryRemove(tempId, out Task? _),
+                    TaskContinuationOptions.ExecuteSynchronously
+                );
             }
             catch (OperationCanceledException)
             {
@@ -583,28 +607,22 @@ public sealed class FileTransferService : IFileTransferService
 
             using TcpClient tcpClient = client;
 
-            // Extract remote IP for peer lookup.
-            if (tcpClient.Client.RemoteEndPoint is IPEndPoint remoteEndPoint)
+            // Extract remote endpoint for peer lookup.
+            if (
+                tcpClient.Client.RemoteEndPoint is not IPEndPoint remoteEndpoint
+            )
             {
-                remoteIpAddress = remoteEndPoint.Address;
+                throw new InvalidOperationException(
+                    "Remote endpoint is not available."
+                );
             }
-
-            IPEndPoint? remoteEndpoint = (IPEndPoint?)
-                tcpClient.Client.RemoteEndPoint;
-
-            ArgumentNullException.ThrowIfNull(
-                remoteEndpoint,
-                nameof(remoteEndpoint)
-            );
+            remoteIpAddress = remoteEndpoint.Address;
 
             await using NetworkStream networkStream = tcpClient.GetStream();
 
             // Create secure P2P stream with X25519 key exchange and ChaCha20-Poly1305 encryption.
-            await using SecureP2PStream secureStream = new(
-                networkStream,
-                this.m_identityKeyManager,
-                leaveOpen: false
-            );
+            await using SecureP2PStream secureStream =
+                new(networkStream, this.m_identityKeyManager, leaveOpen: false);
 
             // Look up expected peer info for TOFU verification.
             PeerInfo? expectedPeer = this.m_peerLookup?.Invoke(remoteIpAddress);
@@ -710,14 +728,15 @@ public sealed class FileTransferService : IFileTransferService
                 )
             );
 
-            await using FileStream fileStream = new(
-                destinationPath,
-                FileMode.Create,
-                FileAccess.Write,
-                FileShare.None,
-                bufferSize: this.m_options.BufferSize,
-                useAsync: true
-            );
+            await using FileStream fileStream =
+                new(
+                    destinationPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: this.m_options.BufferSize,
+                    useAsync: true
+                );
 
             for (
                 int expectedIndex = 0;

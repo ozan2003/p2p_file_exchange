@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 using P2PFileExchange.Core.Utilities;
 
-namespace P2PFileExchange.Core.Services.Security;
+namespace P2PFileExchange.Core.Security;
 
 /// <summary>
 /// Severity levels for audit log events.
@@ -76,13 +76,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
         /// <summary>Password removed from OS keyring.</summary>
         public const string AutoUnlockDisabled = "AUTO_UNLOCK_DISABLED";
 
-        // Legacy aliases for backward compatibility
-        /// <summary>The identity key was unlocked.</summary>
-        public const string IdentityKeyUnlocked = "IDENTITY_LOADED";
-
-        /// <summary>The identity key was created.</summary>
-        public const string IdentityKeyCreated = "IDENTITY_GENERATED";
-
         #endregion Identity Events
 
         #region Discovery Events
@@ -144,10 +137,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
 
         /// <summary>Stream disposed, session keys cleared.</summary>
         public const string ConnectionClosed = "CONNECTION_CLOSED";
-
-        // Legacy alias
-        /// <summary>A secure connection was established.</summary>
-        public const string SecureConnectionEstablished = "HANDSHAKE_COMPLETE";
 
         #endregion Connection Events
 
@@ -312,7 +301,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
                 Id INTEGER PRIMARY KEY AUTOINCREMENT,
                 Timestamp INTEGER NOT NULL,
                 EventType TEXT NOT NULL,
-                Severity TEXT NOT NULL DEFAULT 'Info',
+                Severity INTEGER NOT NULL DEFAULT 0,
                 PeerId TEXT,
                 PeerName TEXT,
                 Details TEXT,
@@ -328,7 +317,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
 
         // Migration: Add Severity column if it doesn't exist (for existing databases)
         const string migrationSql = """
-            ALTER TABLE AuditLog ADD COLUMN Severity TEXT NOT NULL DEFAULT 'Info';
+            ALTER TABLE AuditLog ADD COLUMN Severity INTEGER NOT NULL DEFAULT 0;
             """;
 
         await using SqliteCommand command = this.m_connection!.CreateCommand();
@@ -418,7 +407,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             command.CommandText = sql;
             command.Parameters.AddWithValue("@timestamp", timestamp);
             command.Parameters.AddWithValue("@eventType", eventType);
-            command.Parameters.AddWithValue("@severity", severity.ToString());
+            command.Parameters.AddWithValue("@severity", (int)severity);
             command.Parameters.AddWithValue(
                 "@peerId",
                 peerId?.ToString() ?? (object)DBNull.Value
@@ -546,28 +535,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             success: true,
             cancellationToken: cancellationToken
         );
-    }
-
-    // Legacy method aliases for backward compatibility
-    /// <summary>
-    /// Logs that the identity key was unlocked.
-    /// </summary>
-    public Task LogIdentityKeyUnlockedAsync(
-        CancellationToken cancellationToken = default
-    )
-    {
-        return this.LogIdentityLoadedAsync(cancellationToken);
-    }
-
-    /// <summary>
-    /// Logs that the identity key was created.
-    /// </summary>
-    public Task LogIdentityKeyCreatedAsync(
-        string fingerprint,
-        CancellationToken cancellationToken = default
-    )
-    {
-        return this.LogIdentityGeneratedAsync(fingerprint, cancellationToken);
     }
 
     #endregion Identity Events
@@ -850,24 +817,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             "Session keys derived successfully",
             ipAddress,
             true,
-            cancellationToken
-        );
-    }
-
-    /// <summary>
-    /// Logs a successful secure connection (alias for HandshakeComplete).
-    /// </summary>
-    public Task LogSecureConnectionAsync(
-        Guid peerId,
-        string peerName,
-        string? ipAddress = null,
-        CancellationToken cancellationToken = default
-    )
-    {
-        return this.LogHandshakeCompleteAsync(
-            peerId,
-            peerName,
-            ipAddress,
             cancellationToken
         );
     }
@@ -1207,9 +1156,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
                             reader.GetInt64(1)
                         ),
                         EventType = reader.GetString(2),
-                        Severity = reader.IsDBNull(3)
-                            ? AuditSeverity.Info
-                            : (AuditSeverity)reader.GetInt32(3),
+                        Severity = (AuditSeverity)reader.GetInt32(3),
                         PeerId = reader.IsDBNull(4)
                             ? null
                             : Guid.Parse(reader.GetString(4)),
@@ -1268,8 +1215,6 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             return;
         }
 
-        this.m_disposed = true;
-
         if (this.m_connection is not null)
         {
             await this.m_connection.CloseAsync().ConfigureAwait(false);
@@ -1277,6 +1222,7 @@ public sealed class SecurityAuditLog : IAsyncDisposable
             this.m_connection = null;
         }
 
+        this.m_disposed = true;
         this.m_dbLock.Dispose();
     }
 
