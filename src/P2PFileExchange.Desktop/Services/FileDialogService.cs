@@ -36,11 +36,8 @@ public sealed class FileDialogService : IFileDialogService
             return null;
         }
 
-        FilePickerOpenOptions options = new()
-        {
-            AllowMultiple = false,
-            Title = "Select a file to send",
-        };
+        FilePickerOpenOptions options =
+            new() { AllowMultiple = false, Title = "Select a file to send" };
 
         IReadOnlyList<IStorageFile> files =
             await window.StorageProvider.OpenFilePickerAsync(options);

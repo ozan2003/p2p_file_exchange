@@ -5,9 +5,9 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
-using P2PFileExchange.Core.Services.Discovery;
-using P2PFileExchange.Core.Services.Security;
-using P2PFileExchange.Core.Services.Transfer;
+using P2PFileExchange.Core.Discovery;
+using P2PFileExchange.Core.Security;
+using P2PFileExchange.Core.Transfer;
 using P2PFileExchange.Desktop.Services;
 using P2PFileExchange.Desktop.Settings;
 using P2PFileExchange.Desktop.ViewModels;
@@ -136,12 +136,13 @@ public partial class App : Application
         IdentityKeyManager identityKeyManager = new();
         WindowProvider windowProvider = new() { MainWindow = mainWindow };
         DialogPasswordProvider passwordProvider = new(windowProvider);
-        IdentityService identityService = new(
-            identityKeyManager,
-            passwordProvider,
-            appSettings.Security.IdentityKeyPath,
-            appSettings.Security.RequirePasswordOnStartup
-        );
+        IdentityService identityService =
+            new(
+                identityKeyManager,
+                passwordProvider,
+                appSettings.Security.IdentityKeyPath,
+                appSettings.Security.RequirePasswordOnStartup
+            );
 
         services.AddSingleton(identityKeyManager);
         services.AddSingleton(identityService);

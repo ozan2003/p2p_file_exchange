@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using P2PFileExchange.Core.Models;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
 namespace P2PFileExchange.Desktop.Services;
 
@@ -391,9 +391,9 @@ public sealed class PeerTrustService : IPeerTrustService
             return;
         }
 
-        this.m_disposed = true;
-
         await this.m_trustManager.DisposeAsync().ConfigureAwait(false);
         await this.m_auditLog.DisposeAsync().ConfigureAwait(false);
+
+        this.m_disposed = true;
     }
 }

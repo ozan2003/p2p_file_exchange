@@ -1,6 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
 namespace P2PFileExchange.Desktop.Views;
 

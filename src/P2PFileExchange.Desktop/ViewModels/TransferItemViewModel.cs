@@ -295,17 +295,14 @@ public sealed class TransferItemViewModel : ReactiveObject
 /// </summary>
 internal sealed class TransferBackgroundConverter : IMultiValueConverter
 {
-    private static readonly SolidColorBrush s_defaultBrush = new(
-        Color.FromArgb(40, 128, 128, 128)
-    );
+    private static readonly SolidColorBrush s_defaultBrush =
+        new(Color.FromArgb(40, 128, 128, 128));
 
-    private static readonly SolidColorBrush s_successBrush = new(
-        Color.FromArgb(40, 76, 175, 80)
-    );
+    private static readonly SolidColorBrush s_successBrush =
+        new(Color.FromArgb(40, 76, 175, 80));
 
-    private static readonly SolidColorBrush s_failureBrush = new(
-        Color.FromArgb(40, 244, 67, 54)
-    );
+    private static readonly SolidColorBrush s_failureBrush =
+        new(Color.FromArgb(40, 244, 67, 54));
 
     /// <inheritdoc />
     public object? Convert(

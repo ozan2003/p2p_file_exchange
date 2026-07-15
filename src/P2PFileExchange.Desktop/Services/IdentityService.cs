@@ -4,7 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
 namespace P2PFileExchange.Desktop.Services;
 

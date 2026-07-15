@@ -64,7 +64,7 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="5"
+                                   PlaceholderText="5"
                                    Classes.warning="{Binding HasPeerTimeoutWarning}" />
 
                     <TextBlock Grid.Row="1"
@@ -78,7 +78,7 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="15"
+                                   PlaceholderText="15"
                                    Width="150"
                                    HorizontalAlignment="Right"
                                    Classes.warning="{Binding HasPeerTimeoutWarning}" />
@@ -94,7 +94,7 @@
                                    Maximum="3600"
                                    Increment="1"
                                    FormatString="0"
-                                   Watermark="5"
+                                   PlaceholderText="5"
                                    Width="150"
                                    HorizontalAlignment="Right" />
                 </Grid>
@@ -121,7 +121,7 @@
                                    Maximum="65536"
                                    Increment="64"
                                    FormatString="0"
-                                   Watermark="256"
+                                   PlaceholderText="256"
                                    Width="150"
                                    HorizontalAlignment="Right" />
 
@@ -136,7 +136,7 @@
                                    Maximum="65536"
                                    Increment="16"
                                    FormatString="0"
-                                   Watermark="80"
+                                   PlaceholderText="80"
                                    Width="150"
                                    HorizontalAlignment="Right" />
 
@@ -151,7 +151,7 @@
                                    Maximum="300"
                                    Increment="5"
                                    FormatString="0"
-                                   Watermark="10"
+                                   PlaceholderText="10"
                                    Width="150"
                                    HorizontalAlignment="Right" />
 
@@ -166,7 +166,7 @@
                                    Maximum="600"
                                    Increment="30"
                                    FormatString="0"
-                                   Watermark="120"
+                                   PlaceholderText="120"
                                    Width="150"
                                    HorizontalAlignment="Right" />
                 </Grid>

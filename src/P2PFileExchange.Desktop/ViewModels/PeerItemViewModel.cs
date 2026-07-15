@@ -23,6 +23,7 @@ public sealed class PeerItemViewModel : ReactiveObject
     private IPAddress m_ipAddress;
     private ushort m_tcpPort;
     private DateTimeOffset m_lastSeen;
+    private readonly string m_identityPublicKey;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="PeerItemViewModel"/> class.
@@ -35,6 +36,7 @@ public sealed class PeerItemViewModel : ReactiveObject
         this.m_ipAddress = peer.IPAddress;
         this.m_tcpPort = peer.TcpPort;
         this.m_lastSeen = peer.LastSeen;
+        this.m_identityPublicKey = peer.IdentityPublicKey;
     }
 
     /// <summary>
@@ -123,6 +125,7 @@ public sealed class PeerItemViewModel : ReactiveObject
             DisplayName = this.DisplayName,
             IPAddress = this.m_ipAddress,
             TcpPort = this.TcpPort,
+            IdentityPublicKey = this.m_identityPublicKey,
             LastSeen = DateTimeOffset.UtcNow,
         };
     }

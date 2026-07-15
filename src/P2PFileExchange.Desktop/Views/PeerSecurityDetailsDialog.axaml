@@ -127,7 +127,7 @@
       <!-- Notes TextBox -->
       <TextBox x:Name="NotesTextBox"
                Grid.Row="3"
-               Watermark="Add notes about this peer..."
+               PlaceholderText="Add notes about this peer..."
                AcceptsReturn="True"
                Height="60"
                TextWrapping="Wrap"

@@ -1,8 +1,8 @@
 using System;
 using System.Net;
-using P2PFileExchange.Core.Services.Discovery;
-using P2PFileExchange.Core.Services.Security;
-using P2PFileExchange.Core.Services.Transfer;
+using P2PFileExchange.Core.Discovery;
+using P2PFileExchange.Core.Security;
+using P2PFileExchange.Core.Transfer;
 using P2PFileExchange.Core.Utilities;
 
 namespace P2PFileExchange.Desktop.Settings;

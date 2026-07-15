@@ -5,12 +5,13 @@ using System.Reactive;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
-using P2PFileExchange.Core.Services.Discovery;
-using P2PFileExchange.Core.Services.Security;
-using P2PFileExchange.Core.Services.Transfer;
+using P2PFileExchange.Core.Discovery;
+using P2PFileExchange.Core.Security;
+using P2PFileExchange.Core.Transfer;
 using P2PFileExchange.Core.Utilities;
 using P2PFileExchange.Desktop.Services;
 using P2PFileExchange.Desktop.Settings;
+using P2PFileExchange.Desktop.Views;
 using ReactiveUI;
 
 namespace P2PFileExchange.Desktop.ViewModels;
@@ -52,8 +53,8 @@ public sealed class SettingsViewModel : ReactiveObject
         this.LoadFromSettings();
 
         this.SaveCommand = ReactiveCommand.Create(this.Save);
-        this.CancelCommand = ReactiveCommand.Create(() =>
-            this.RequestClose?.Invoke(this, EventArgs.Empty)
+        this.CancelCommand = ReactiveCommand.Create(
+            () => this.RequestClose?.Invoke(this, EventArgs.Empty)
         );
         this.BrowseDownloadDirectoryCommand = ReactiveCommand.CreateFromTask(
             this.BrowseDownloadDirectoryAsync
@@ -365,10 +366,7 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
-        if (this.m_fileTransferService is FileTransferService transferService)
-        {
-            transferService.UpdateDownloadDirectory(downloadDirectory);
-        }
+        this.m_fileTransferService.UpdateDownloadDirectory(downloadDirectory);
 
         this.RequestClose?.Invoke(this, EventArgs.Empty);
     }
@@ -420,13 +418,9 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
-        // Update the download directory in the transfer service.
-        if (this.m_fileTransferService is FileTransferService transferService)
-        {
-            transferService.UpdateDownloadDirectory(
-                this.m_settings.DownloadDirectory
-            );
-        }
+        this.m_fileTransferService.UpdateDownloadDirectory(
+            this.m_settings.DownloadDirectory
+        );
 
         // Reload the UI fields from the updated settings.
         this.LoadFromSettings();
@@ -463,15 +457,19 @@ public sealed class SettingsViewModel : ReactiveObject
             return;
         }
 
-        FilePickerSaveOptions options = new()
-        {
-            Title = "Export Identity Key",
-            SuggestedFileName = "identity-backup.key",
-            FileTypeChoices =
-            [
-                new FilePickerFileType("Identity Key") { Patterns = ["*.key"] },
-            ],
-        };
+        FilePickerSaveOptions options =
+            new()
+            {
+                Title = "Export Identity Key",
+                SuggestedFileName = "identity-backup.key",
+                FileTypeChoices =
+                [
+                    new FilePickerFileType("Identity Key")
+                    {
+                        Patterns = ["*.key"],
+                    },
+                ],
+            };
 
         IStorageFile? file = await window.StorageProvider.SaveFilePickerAsync(
             options
@@ -511,87 +509,12 @@ public sealed class SettingsViewModel : ReactiveObject
         }
 
         // Show confirmation dialog
-        var confirmDialog = new Window
-        {
-            Title = "Regenerate Identity",
-            Width = 450,
-            SizeToContent = SizeToContent.Height,
-            MinHeight = 200,
-            MaxHeight = 400,
-            WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            CanResize = false,
-            Content = new StackPanel
-            {
-                Margin = new Avalonia.Thickness(20),
-                Spacing = 16,
-                Children =
-                {
-                    new TextBlock
-                    {
-                        Text = "Warning",
-                        FontWeight = Avalonia.Media.FontWeight.Bold,
-                        FontSize = 16,
-                    },
-                    new TextBlock
-                    {
-                        Text =
-                            "Regenerating your identity will:\n"
-                            + "• Create a new cryptographic identity\n"
-                            + "• All peers will see you as a new, untrusted peer\n"
-                            + "• You will need to verify your new fingerprint with peers\n\n"
-                            + "This action cannot be undone.",
-                        TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-                    },
-                    new StackPanel
-                    {
-                        Orientation = Avalonia.Layout.Orientation.Horizontal,
-                        HorizontalAlignment = Avalonia
-                            .Layout
-                            .HorizontalAlignment
-                            .Right,
-                        Spacing = 8,
-                        Children =
-                        {
-                            new Button
-                            {
-                                Content = "Cancel",
-                                Tag = false,
-                                Width = 80,
-                            },
-                            new Button
-                            {
-                                Content = "Regenerate",
-                                Tag = true,
-                                Width = 100,
-                            },
-                        },
-                    },
-                },
-            },
-        };
+        IdentityRegenerateDialog dialog = new();
+        IdentityRegenerateDialogResult result = await dialog
+            .ShowAndWaitAsync(window)
+            .ConfigureAwait(true);
 
-        bool? result = null;
-        if (
-            confirmDialog.Content is StackPanel panel
-            && panel.Children[2] is StackPanel buttonPanel
-        )
-        {
-            foreach (Control child in buttonPanel.Children)
-            {
-                if (child is Button button)
-                {
-                    button.Click += (_, _) =>
-                    {
-                        result = button.Tag is true;
-                        confirmDialog.Close();
-                    };
-                }
-            }
-        }
-
-        await confirmDialog.ShowDialog(window);
-
-        if (result != true)
+        if (result != IdentityRegenerateDialogResult.Regenerate)
         {
             return;
         }

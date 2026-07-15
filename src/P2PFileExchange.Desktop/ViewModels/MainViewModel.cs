@@ -8,11 +8,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using P2PFileExchange.Core.Discovery;
 using P2PFileExchange.Core.Models;
 using P2PFileExchange.Core.Models.TransferEvents;
-using P2PFileExchange.Core.Services.Discovery;
-using P2PFileExchange.Core.Services.Security;
-using P2PFileExchange.Core.Services.Transfer;
+using P2PFileExchange.Core.Security;
+using P2PFileExchange.Core.Transfer;
 using P2PFileExchange.Core.Utilities;
 using P2PFileExchange.Desktop.Services;
 using P2PFileExchange.Desktop.Settings;
@@ -257,8 +257,8 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 downloadDirectory =
                     FilePathUtilities.GetDefaultDownloadDirectory();
             }
-            await ((FileTransferService)this.m_fileTransferService)
-                .StartListenerAsync(
+            await this
+                .m_fileTransferService.StartListenerAsync(
                     0, // dynamic port
                     downloadDirectory,
                     this.m_identityKeyManager,
@@ -580,13 +580,14 @@ public sealed class MainViewModel : ReactiveObject, IDisposable
                 return;
             }
 
-            TransferItemViewModel viewModel = new(
-                args.TransferId,
-                args.Mode,
-                args.Metadata.FileName,
-                args.Metadata.FileSize,
-                args.RemoteEndpoint
-            );
+            TransferItemViewModel viewModel =
+                new(
+                    args.TransferId,
+                    args.Mode,
+                    args.Metadata.FileName,
+                    args.Metadata.FileSize,
+                    args.RemoteEndpoint
+                );
 
             this.m_transferLookup[args.TransferId] = viewModel;
             this.Transfers.Add(viewModel);

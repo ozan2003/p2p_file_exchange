@@ -27,12 +27,9 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnDragOver(object? sender, DragEventArgs e)
     {
-        // Only accept file drops
-#pragma warning disable CS0618 // Type or member is obsolete
-        e.DragEffects = e.Data.Contains(DataFormats.Files)
+        e.DragEffects = e.DataTransfer.TryGetFiles() is not null
             ? DragDropEffects.Copy
             : DragDropEffects.None;
-#pragma warning restore CS0618
     }
 
     /// <summary>
@@ -51,7 +48,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        this.FocusManager?.ClearFocus();
+        TopLevel.GetTopLevel(this)?.FocusManager?.Focus(null);
     }
 
     /// <summary>
@@ -69,9 +66,7 @@ public partial class MainWindow : Window
             return;
         }
 
-#pragma warning disable CS0618 // Type or member is obsolete
-        IEnumerable<IStorageItem>? files = e.Data.GetFiles();
-#pragma warning restore CS0618
+        IEnumerable<IStorageItem>? files = e.DataTransfer.TryGetFiles();
 
         if (files == null)
         {

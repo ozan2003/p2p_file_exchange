@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
-using P2PFileExchange.Core.Services.Security;
+using P2PFileExchange.Core.Security;
 
 namespace P2PFileExchange.Desktop.Services;
 

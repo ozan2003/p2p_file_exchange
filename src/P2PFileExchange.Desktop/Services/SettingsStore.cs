@@ -111,10 +111,8 @@ public sealed class SettingsStore
     /// </summary>
     private static JsonSerializerOptions CreateJsonOptions()
     {
-        JsonSerializerOptions options = new(JsonSerializerDefaults.Web)
-        {
-            WriteIndented = true,
-        };
+        JsonSerializerOptions options =
+            new(JsonSerializerDefaults.Web) { WriteIndented = true };
         options.Converters.Add(new TimeSpanIso8601Converter());
         options.Converters.Add(new IPAddressConverter());
         return options;
